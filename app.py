@@ -1,7 +1,7 @@
 import streamlit as st
 from chatbot import get_response
 
-st.title("🏥 Health Chatbot")
+st.title("🏥 Your Health Chatbot")
 
 # Store chat history
 if "messages" not in st.session_state:
