@@ -1,5 +1,5 @@
-pandas
-langchain
-openai
-python-dotenv
-pyscopg2
+google-generativeai 
+streamlit
+python-dotenv  #for loading environment variables from .env file
+langchain==1.0.5 
+langchain-groq==1.0.0
