@@ -1,3 +1,9 @@
 /.venv
 .env
+*.env
 __pycache__/
+#Ignore the scratch folder
+/scratch
+/.streamlit/
+google_credentials.json
+google_credentials*.json
