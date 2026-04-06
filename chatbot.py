@@ -12,7 +12,7 @@ load_dotenv(Path("./.env"))
 # Load variables from .env before reading GROK_API_KEY.
 
 
-api_key = os.getenv("GROK_API_KEY")
+api_key = os.getenv("GROQ_API_KEY")
 if not api_key:
     raise RuntimeError(
         "Missing GROK_API_KEY. Add it to your .env file or environment variables."
