@@ -1,5 +1,6 @@
 google-generativeai 
 streamlit
+requests
 python-dotenv  #for loading environment variables from .env file
 langchain==1.0.5 
 langchain-groq==1.0.0
@@ -7,3 +8,8 @@ python-jose[cryptography] # for JWT handling in GAuth with python version 3.11
 # fastapi 
 fastapi[all]
 uvicorn #installed with fastapi
+
+#for database
+sqlalchemy #for ORM support
+asyncpg # for async PostgreSQL support
+psycopg2-binary  # for PostgreSQL support

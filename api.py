@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, Request, HTTPException,Depends
 from fastapi.responses import HTMLResponse, RedirectResponse
 import os
 import urllib.parse
@@ -6,8 +6,31 @@ import httpx
 import requests  # pip install requests
 from dotenv import load_dotenv
 from pathlib import Path
+#for database operations
+from database import engine, Base, get_db, disconnect_db
+from sqlalchemy.ext.asyncio import AsyncSession
+#improting the upsert_user function from crud.py to save user info to database
+from crud import upsert_user
+
+
+#for creating tables on startup and disconnecting db on shutdown
+from database import engine, Base, get_db
+from models import User  
 
 app = FastAPI()
+
+#Functions to handle database connection on startup and shutdown
+@app.get("/startup")
+async def startup():
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    print("Database connected")
+
+#for shutdown, we will dispose the engine to close all connections gracefully
+@app.get("/shutdown")
+async def shutdown():
+    await disconnect_db()
+
 
 load_dotenv(Path("./.env"))
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
@@ -45,7 +68,7 @@ def login():
 
 
 @app.get("/auth/callback")
-async def auth_callback(request: Request):
+async def auth_callback(request: Request, db: AsyncSession = Depends(get_db)):  # ← add db
     code = request.query_params.get("code")
     if not code:
         raise HTTPException(status_code=400, detail="Authorization code not found")
@@ -70,36 +93,24 @@ async def auth_callback(request: Request):
         userinfo_response = await client.get(GOOGLE_USERINFO_ENDPOINT, headers=headers)
         userinfo = userinfo_response.json()
 
-    return RedirectResponse(
-        f"/profile?name={userinfo['name']}&email={userinfo['email']}&picture={userinfo['picture']}"
+    print(f"✅ User info from Google: {userinfo}")  # debug line
+
+    # ✅ THIS WAS MISSING — save user to DB
+    user = await upsert_user(
+        db,
+        google_sub=userinfo["id"],
+        email=userinfo.get("email"),
+        name=userinfo.get("name"),
+        picture=userinfo.get("picture"),
     )
 
+    print(f"✅ User saved: {user.email}")  # debug line
 
-@app.get("/auth")
-async def auth_streamlit_callback(request: Request):
-    code = request.query_params.get("code")
-    if not code:
-        raise HTTPException(status_code=400, detail="Authorization code not found")
-
-    data = {
-        "code": code,
-        "client_id": GOOGLE_CLIENT_ID,
-        "client_secret": GOOGLE_CLIENT_SECRET,
-        "redirect_uri": GOOGLE_REDIRECT_URI,
-        "grant_type": "authorization_code",
-    }
-
-    response = requests.post(GOOGLE_TOKEN_ENDPOINT, data=data)
-    token = response.json()
-    access_token = token.get("access_token")
-
-    user_info = requests.get(
-        GOOGLE_USERINFO_ENDPOINT,
-        headers={"Authorization": f"Bearer {access_token}"}
-    ).json()
-
-    email = user_info.get("email")
-    return RedirectResponse(url=f"http://localhost:8501/?user={email}")
+    # Redirect based on onboarding status
+    if not user.is_onboarded:
+        return RedirectResponse(f"http://localhost:8501/?user={user.email}&onboarded=false")
+    else:
+        return RedirectResponse(f"http://localhost:8501/?user={user.email}&onboarded=true")
 
 
 @app.get("/profile", response_class=HTMLResponse)
@@ -118,3 +129,10 @@ async def profile(request: Request):
         </body>
     </html>
     """
+
+
+@app.get("/startup")
+async def startup():
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    print("✅ Tables created successfully")

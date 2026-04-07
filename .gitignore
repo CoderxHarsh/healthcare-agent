@@ -7,3 +7,5 @@ __pycache__/
 /.streamlit/
 google_credentials.json
 google_credentials*.json
+
+stages.md
