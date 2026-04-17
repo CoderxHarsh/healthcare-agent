@@ -1,18 +1,39 @@
+"""
+FastAPI Backend for HealthCare AI Assistant
+============================================
+Handles Google OAuth authentication, user profile management, 
+health metrics logging, medication tracking, and API endpoints.
+"""
+
+# FastAPI core - Web framework for building APIs
 from fastapi import FastAPI, Request, HTTPException, Depends
+# Response types - HTML and redirect responses for web UI
 from fastapi.responses import HTMLResponse, RedirectResponse
+# Pydantic - Data validation and serialization
 from pydantic import BaseModel
+# os - Environment variable and path handling
 import os
+# urllib.parse - URL encoding for OAuth parameters
 import urllib.parse
+# httpx - Async HTTP client for Google API calls
 import httpx
+# requests - HTTP client for making external API calls
 import requests  # pip install requests
+# python-dotenv - Load .env configuration files
 from dotenv import load_dotenv
+# pathlib - Cross-platform file path handling
 from pathlib import Path
+# datetime - Date and time operations
 from datetime import date, datetime
-#for database operations
+
+# Database connection, session management, and table initialization
 from database import engine, Base, get_db, disconnect_db
+# SQLAlchemy async - Async database operations
 from sqlalchemy.ext.asyncio import AsyncSession
+# SQLAlchemy select - Building SQL queries
 from sqlalchemy.future import select
-#importing the functions from crud.py
+
+# CRUD operations - User, health logs, medications, and onboarding functions
 from crud import (
     upsert_user, create_health_log, get_user_health_logs, 
     get_health_metrics_summary, get_latest_health_log,
@@ -21,24 +42,30 @@ from crud import (
     deactivate_medication, log_medication_status, get_medication_logs,
     get_adherence_stats
 )
-#for creating tables on startup and disconnecting db on shutdown
-from database import engine, Base, get_db
+
+# SQLAlchemy models - User database model
 from models import User
+# Health metric parser - Extract health metrics from natural language
 from data_parser import HealthMetricParser
+# Google Calendar integration - Create/delete medication reminders
 from google_calendar import create_medication_reminder, delete_medication_reminder
 
 app = FastAPI()
 
-#Functions to handle database connection on startup and shutdown
+# ============================================
+# STARTUP & SHUTDOWN OPERATIONS
+# ============================================
+
 @app.get("/startup")
 async def startup():
+    """Initialize database tables on application startup"""
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     print("Database connected")
 
-#for shutdown, we will dispose the engine to close all connections gracefully
 @app.get("/shutdown")
 async def shutdown():
+    """Gracefully close all database connections on application shutdown"""
     await disconnect_db()
 
 
@@ -57,6 +84,7 @@ GOOGLE_USERINFO_ENDPOINT = "https://www.googleapis.com/oauth2/v2/userinfo"
 
 @app.get("/", response_class=HTMLResponse)
 async def home():
+    """Display home page with Google OAuth login link"""
     return """
     <h2>Welcome to FastAPI Google OAuth2 Login</h2>
     <a href="/login">Login with Google</a>
@@ -81,6 +109,7 @@ async def health_check():
 
 @app.get("/login")
 def login():
+    """Initiate Google OAuth2 flow by redirecting to Google's authorization endpoint"""
     query_params = {
         "client_id": GOOGLE_CLIENT_ID,
         "redirect_uri": GOOGLE_REDIRECT_URI,
@@ -190,6 +219,7 @@ async def auth_callback(request: Request, db: AsyncSession = Depends(get_db)):
 
 @app.get("/profile", response_class=HTMLResponse)
 async def profile(request: Request):
+    """Display user's profile information from Google OAuth"""
     name = request.query_params.get("name")
     email = request.query_params.get("email")
     picture = request.query_params.get("picture")
@@ -207,7 +237,7 @@ async def profile(request: Request):
 
 
 # ============================================
-# PYDANTIC MODELS FOR HEALTH LOGS
+# PYDANTIC MODELS - Data validation for health logs
 # ============================================
 
 class HealthLogCreate(BaseModel):
@@ -230,7 +260,7 @@ class HealthLogResponse(BaseModel):
 
 
 # ============================================
-# HEALTH LOG ENDPOINTS
+# HEALTH LOG ENDPOINTS - Create and retrieve health metrics
 # ============================================
 
 @app.post("/health-logs/{user_id}")

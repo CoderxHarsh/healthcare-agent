@@ -1,10 +1,23 @@
+"""
+Database Migration: Add Onboarding Columns to Users Table
+=========================================================
+Adds health profile fields (age, weight, height, etc.) to users table.
+Run once during database setup to add missing columns.
+
+Usage: python migrate_users_table.py
+"""
+
+# asyncio - Async runtime for database operations
 import asyncio
+# asyncpg - PostgreSQL async driver for direct database access
 import asyncpg
+# os - Environment variable access
 import os
+# python-dotenv - Load .env configuration
 from dotenv import load_dotenv
 
 async def migrate():
-    """Add missing columns to users table"""
+    """Add missing health profile columns to the users table"""
     load_dotenv()
     DATABASE_URL = os.getenv("DATABASE_URL")
     

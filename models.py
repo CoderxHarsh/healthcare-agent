@@ -1,7 +1,19 @@
+"""
+Database Models for HealthCare AI
+==================================
+SQLAlchemy ORM models for users, health logs, medications, and adherence tracking.
+"""
+
+# SQLAlchemy column types - Define database columns for ORM models
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, func, Text, Float, ForeignKey, Date, Time
+# Database base class - Provides ORM foundation for all models
 from database import Base
 
 class User(Base):
+    """
+    User model - Stores Google OAuth user data and health profile information.
+    Includes authentication tokens, onboarding status, and personal health metrics.
+    """
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True)
@@ -30,6 +42,10 @@ class User(Base):
 
 
 class HealthLog(Base):
+    """
+    Health metrics log model - Tracks individual health measurements.
+    Records blood pressure, weight, heart rate, sleep, exercise, temperature, etc.
+    """
     __tablename__ = "health_logs"
 
     id = Column(Integer, primary_key=True)
@@ -43,6 +59,10 @@ class HealthLog(Base):
 
 
 class Medication(Base):
+    """
+    Medication model - Stores prescribed medications and treatment information.
+    Tracks medication name, dosage, frequency, and creates Google Calendar reminders.
+    """
     __tablename__ = "medications"
 
     id = Column(Integer, primary_key=True)
@@ -60,6 +80,10 @@ class Medication(Base):
 
 
 class MedicationLog(Base):
+    """
+    Medication adherence log model - Tracks whether medications were taken on schedule.
+    Records daily medication compliance for adherence monitoring and health analytics.
+    """
     __tablename__ = "medication_logs"
 
     id = Column(Integer, primary_key=True)

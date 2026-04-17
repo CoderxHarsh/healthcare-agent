@@ -1,6 +1,17 @@
+"""
+Database Configuration for HealthCare AI
+=========================================
+Manages async PostgreSQL connection pool, session management,
+and ORM base configuration using SQLAlchemy 2.0.
+"""
+
+# SQLAlchemy async - Async database engine and session factory
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+# SQLAlchemy ORM - Session management and base model
 from sqlalchemy.orm import sessionmaker, DeclarativeBase
+# os - Environment variable access for database URL
 import os
+# python-dotenv - Load .env configuration file
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -24,12 +35,15 @@ AsyncSessionLocal = sessionmaker(
 )
 
 class Base(DeclarativeBase):
+    """Base class for all SQLAlchemy ORM models"""
     pass
 
 async def get_db():
+    """Dependency for FastAPI routes - provides database session to endpoints"""
     async with AsyncSessionLocal() as session:
         yield session
 
 async def disconnect_db():
+    """Close all database connections gracefully"""
     await engine.dispose()
     print("✅ Database disconnected successfully")

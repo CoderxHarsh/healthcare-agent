@@ -1,10 +1,21 @@
+"""
+Onboarding Data Verification Utility
+=====================================
+Debug script to inspect user onboarding data stored in the database.
+Displays user profiles, health metrics, and onboarding completion status.
+"""
+
+# asyncio - Async runtime for running async database queries
 import asyncio
+# AsyncSessionLocal - Get database session for queries
 from database import AsyncSessionLocal
+# User model - ORM model for users table
 from models import User
+# SQLAlchemy select - Building SQL queries
 from sqlalchemy.future import select
 
 async def check_user_data():
-    """Check if user onboarding data is stored in database"""
+    """Query and display all user onboarding profiles from the database"""
     async with AsyncSessionLocal() as db:
         try:
             # Get all users

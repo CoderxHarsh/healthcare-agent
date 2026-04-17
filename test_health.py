@@ -1,4 +1,15 @@
+"""
+API Health Check Test
+=====================
+Verifies FastAPI server is running and configuration is correct.
+Checks OAuth and database status through the /health endpoint.
+
+Run from: python test_health.py (requires FastAPI server running on port 8000)
+"""
+
+# requests - HTTP client for making API calls
 import requests
+# json - JSON formatting for display
 import json
 
 try:

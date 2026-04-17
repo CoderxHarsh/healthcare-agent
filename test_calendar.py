@@ -1,5 +1,20 @@
-"""Test Google Calendar event creation - run from project root"""
-import asyncio, asyncpg, os
+"""
+Google Calendar Integration Test
+================================
+Tests medication reminder creation in Google Calendar.
+Verifies OAuth token refresh and event creation API functionality.
+
+Run from: python test_calendar.py
+Requires: User with ID 8 in database with valid Google refresh token
+"""
+
+# asyncio - Async runtime for database operations
+import asyncio
+# asyncpg - PostgreSQL async driver for fetching user tokens
+import asyncpg
+# os - Environment variable access
+import os
+# python-dotenv - Load .env configuration
 from dotenv import load_dotenv
 load_dotenv()
 

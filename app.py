@@ -1,7 +1,19 @@
+"""
+Streamlit Frontend for HealthCare AI Assistant
+===============================================
+Interactive web interface for health chatbot with user authentication,
+onboarding, health tracking, medication management, and wellness metrics.
+"""
+
+# Streamlit - Web app framework for building data dashboards and UIs
 import streamlit as st
+# Chatbot AI responses - Get personalized health advice using LLM
 from chatbot import get_response
+# Health metric parser - Extract metrics from natural language input
 from data_parser import HealthMetricParser
+# requests - HTTP client for communicating with FastAPI backend
 import requests
+# datetime - Date/time operations for health tracking
 from datetime import datetime, timedelta, date
 
 # ============================================
@@ -64,7 +76,11 @@ if "page" in params:
 # ============================================
 
 def show_onboarding_page():
-    """Display the onboarding form for new users"""
+    """
+    Display and handle the user health profile onboarding form.
+    Collects age, weight, height, health conditions, medications, allergies,
+    fitness level, and health goals. Saves data to backend API.
+    """
     st.title("🎯 Complete Your Health Profile")
     st.markdown("---")
     st.markdown("### Help us know you better!")

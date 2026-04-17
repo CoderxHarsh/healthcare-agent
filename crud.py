@@ -1,13 +1,31 @@
+"""
+CRUD Operations for HealthCare AI
+==================================
+Database operations for users, health logs, medications, and adherence tracking.
+Provides async functions for creating, reading, and updating health data.
+"""
+
+# SQLAlchemy async - Async database session management
 from sqlalchemy.ext.asyncio import AsyncSession
+# SQLAlchemy select - Building SQL SELECT queries
 from sqlalchemy.future import select
+# SQLAlchemy PostgreSQL - PostgreSQL-specific insert with conflict handling
 from sqlalchemy.dialects.postgresql import insert
+# ORM models - Database models for users, health logs, medications
 from models import User, HealthLog, Medication, MedicationLog
+# SQLAlchemy functions - SQL functions like NOW()
 from sqlalchemy.sql import func
+# datetime - Date and time operations
 from datetime import datetime, timedelta, date
+# typing - Type hints for function parameters and returns
 from typing import List, Dict, Optional
 
 async def upsert_user(db: AsyncSession, google_sub: str, email: str, name: str, picture: str, refresh_token: str = None) -> User:
-    # Upsert: insert or update last_login_at if user already exists
+    """
+    Upsert user record - Insert new user or update if already exists.
+    Stores Google OAuth identity and updates last login timestamp.
+    Returns the User object after insert/update.
+    """
     values = dict(
         google_sub=google_sub,
         email=email,
@@ -39,7 +57,7 @@ async def upsert_user(db: AsyncSession, google_sub: str, email: str, name: str, 
 
 
 # ============================================
-# HEALTH LOG CRUD OPERATIONS
+# HEALTH LOG CRUD OPERATIONS - Track health metrics over time
 # ============================================
 
 async def create_health_log(
@@ -136,7 +154,7 @@ async def delete_health_log(db: AsyncSession, log_id: int) -> bool:
 
 
 # ============================================
-# ONBOARDING CRUD OPERATIONS
+# ONBOARDING CRUD OPERATIONS - Manage user health profiles
 # ============================================
 
 async def update_user_onboarding(
@@ -216,7 +234,7 @@ async def get_user_profile(db: AsyncSession, user_id: int) -> Optional[User]:
 
 
 # ============================================
-# MEDICATION CRUD OPERATIONS
+# MEDICATION CRUD OPERATIONS - Manage user medications and adherence
 # ============================================
 
 async def create_medication(
