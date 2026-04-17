@@ -10,10 +10,11 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 engine = create_async_engine(
     DATABASE_URL,
     echo=True,
-    pool_size=5,          # Neon has connection limits on free tier 5 users can connect simultaneously
-    max_overflow=2,       #allow up to 2 (5+2=7) additional connections beyond the pool_size if needed
-    pool_timeout=30,      #8th user in line
-    pool_recycle=1800,    # Recycle connections every 30 min
+    pool_size=5,          # Neon has connection limits on free tier (5 simultaneous connections)
+    max_overflow=2,       # Allow up to 2 extra connections beyond pool_size if needed (5+2=7 max)
+    pool_timeout=30,      # Wait up to 30s for a connection from the pool
+    pool_recycle=300,     # Recycle connections every 5 min — matches Neon's idle timeout
+    pool_pre_ping=True,   # Test connection health before use; auto-reconnects closed/stale connections
 )
 
 AsyncSessionLocal = sessionmaker(
