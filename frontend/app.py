@@ -619,7 +619,7 @@ if st.session_state.user:
                                     result = response.json()
                                     st.success(f"✅ {med_name} added successfully!")
                                     if result.get("calendar_event") == "created":
-                                        st.info("📅 Google Calendar reminder created! You'll get popup + email notifications.")
+                                        st.info("📅 Google Calendar reminder created!")
                                     else:
                                         st.warning("⚠️ Calendar reminder not created. Please re-login to grant calendar access.")
                                     st.balloons()
