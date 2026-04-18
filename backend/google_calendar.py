@@ -11,9 +11,12 @@ import os
 import json
 from datetime import datetime, timedelta, date
 from typing import Optional, Dict
-from dotenv import load_dotenv
+from dotenv import load_dotenv, find_dotenv
+from pathlib import Path
 
-load_dotenv()
+# Load .env from root directory (works from any location)
+env_path = find_dotenv() or Path(__file__).parent.parent / ".env"
+load_dotenv(env_path)
 
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")

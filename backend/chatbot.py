@@ -10,7 +10,10 @@ from pathlib import Path
 from tools import get_tool_context
 #for medical info retrieval form medlineplus api
 from medlineplus import get_medical_info
-load_dotenv(Path("./.env"))
+
+# Load .env from root directory (works from any location)
+env_path = find_dotenv() or Path(__file__).parent.parent / ".env"
+load_dotenv(env_path)
 
 import re
 #for cleaning html tags from medlineplus summaries

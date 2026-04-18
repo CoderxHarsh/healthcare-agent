@@ -20,7 +20,7 @@ import httpx
 # requests - HTTP client for making external API calls
 import requests  # pip install requests
 # python-dotenv - Load .env configuration files
-from dotenv import load_dotenv
+from dotenv import load_dotenv, find_dotenv
 # pathlib - Cross-platform file path handling
 from pathlib import Path
 # datetime - Date and time operations
@@ -69,7 +69,9 @@ async def shutdown():
     await disconnect_db()
 
 
-load_dotenv(Path("./.env"))
+# Load .env from root directory (works from any location)
+env_path = find_dotenv() or Path(__file__).parent.parent / ".env"
+load_dotenv(env_path)
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
 GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI")
