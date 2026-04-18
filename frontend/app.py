@@ -5,6 +5,12 @@ Interactive web interface for health chatbot with user authentication,
 onboarding, health tracking, medication management, and wellness metrics.
 """
 
+import sys
+import os
+
+# Add backend folder to Python path for imports
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'backend'))
+
 # Streamlit - Web app framework for building data dashboards and UIs
 import streamlit as st
 # Chatbot AI responses - Get personalized health advice using LLM
