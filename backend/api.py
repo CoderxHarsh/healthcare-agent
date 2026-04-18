@@ -202,10 +202,11 @@ async def auth_callback(request: Request, db: AsyncSession = Depends(get_db)):
             raise HTTPException(status_code=500, detail=f"Failed to save user to database: {str(e)}")
 
         # Redirect based on onboarding status
+        encoded_name = urllib.parse.quote(user.name or "User")
         if not user.is_onboarded:
-            redirect_url = f"http://localhost:8501/?user={user.email}&user_id={user.id}&onboarded=false"
+            redirect_url = f"http://localhost:8501/?user={encoded_name}&user_id={user.id}&onboarded=false"
         else:
-            redirect_url = f"http://localhost:8501/?user={user.email}&user_id={user.id}&onboarded=true"
+            redirect_url = f"http://localhost:8501/?user={encoded_name}&user_id={user.id}&onboarded=true"
         
         print(f"🔗 Redirecting to: {redirect_url}")
         return RedirectResponse(url=redirect_url)

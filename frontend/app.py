@@ -63,8 +63,8 @@ if "health_logs" not in st.session_state:
 # -------------------------
 params = st.query_params
 
-# FastAPI sends: ?user=email@gmail.com&onboarded=true/false&user_id=123
-if "user" in params and st.session_state.user is None:
+# FastAPI sends: ?user=name&onboarded=true/false&user_id=123
+if "user" in params:
     st.session_state.user = params["user"]
     st.session_state.onboarded = params.get("onboarded", "false")
     try:
