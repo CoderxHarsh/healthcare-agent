@@ -8,9 +8,15 @@ import os
 from dotenv import load_dotenv, find_dotenv
 from pathlib import Path
 from tools import get_tool_context
-
+#for medical info retrieval form medlineplus api
+from medlineplus import get_medical_info
 load_dotenv(Path("./.env"))
 
+import re
+#for cleaning html tags from medlineplus summaries
+def clean_html(text):
+    clean = re.sub('<.*?>', '', text)
+    return clean
 # Load variables from .env before reading GROK_API_KEY.
 
 api_key = os.getenv("GROK_API_KEY")
@@ -35,9 +41,37 @@ model = ChatGroq(
 Robotic                 Balanced                  Chaotic
 Always picks          Mix of safe +            Very random,
 safest answer          creative                unpredictable"""
-
-
 def get_response(user_input, user_profile=None, health_logs=None):
+
+    # -------------------------------
+    # 🧠 STEP 1: Try MedlinePlus FIRST
+    # -------------------------------
+    medical_keywords = ["what is", "symptoms", "disease", "treatment", "condition"]
+
+    if any(word in user_input.lower() for word in medical_keywords):
+        med_data = get_medical_info(user_input)
+
+        if med_data:
+            clean_text = clean_html(med_data['summary'])
+            prompt = f"""Explain the follwoing medical information in simple clear terms.
+            keep it :
+            - Sort(5-6 lines)
+            - easy to understand (avoid medical jargon)
+            - actionable (what can the user do with this info)
+            - safe (avoid giving dangerous advice)
+            - Present answer in well formatted bullet points if possible.
+
+            Medicinal Info:
+            {clean_text}
+
+            User Question: {user_input}
+            """
+            response = model.invoke(prompt)
+            return f"""{response.text}\n
+            Source: MedlinePlus (https://medlineplus.gov/)
+            Disclaimer: This information is for educational purposes only. Consult a healthcare professional for personalized medical advice."""
+
+
     # Build a personalized context block from onboarding data
     profile_context = ""
     if user_profile:
