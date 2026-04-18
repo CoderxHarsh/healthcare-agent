@@ -109,22 +109,63 @@ User → Streamlit UI → FastAPI Backend → PostgreSQL (Neon)
 
 ```
 HealthCareAGENT/
-├── app.py                  # Streamlit frontend (chat, tracker, onboarding)
-├── api.py                  # FastAPI backend (OAuth, REST endpoints)
-├── chatbot.py              # LLM integration (prompt builder, profile/logs injection)
-├── tools.py                # 5 specialized healthcare tools + topic router
-├── models.py               # SQLAlchemy models (User, HealthLog)
-├── crud.py                 # Database CRUD operations
-├── database.py             # Async DB engine & session setup
-├── data_parser.py          # Regex-based health metric extractor
-├── migrate_users_table.py  # DB migration script for onboarding columns
-├── requirements.txt        # Python dependencies
-└── .env                    # Environment variables (API keys, DB URL, OAuth)
+├── frontend/               # Streamlit UI
+│   ├── app.py             # Main Streamlit application
+│   ├── requirements.txt   # Frontend dependencies
+│   └── .env               # Environment variables
+│
+├── backend/               # FastAPI Server
+│   ├── api.py             # FastAPI main server (OAuth, REST endpoints)
+│   ├── chatbot.py         # LLM integration (Groq + LangChain)
+│   ├── tools.py           # 5 specialized healthcare tools + router
+│   ├── models.py          # SQLAlchemy models (User, HealthLog, Medication)
+│   ├── crud.py            # Database CRUD operations
+│   ├── database.py        # Async DB engine & session setup
+│   ├── data_parser.py     # Health metric extractor from natural language
+│   ├── google_calendar.py # Google Calendar integration
+│   ├── medication.py      # Medication management
+│   ├── medlineplus.py     # Medical research API integration
+│   ├── ingestion.py       # Data ingestion utilities
+│   ├── google_credentials.json # Google OAuth credentials
+│   ├── migrate_*.py       # Database migration scripts
+│   ├── test_*.py          # Test files
+│   ├── requirements.txt   # Backend dependencies
+│   └── .env               # Environment variables
+│
+├── data/                  # Data folder
+├── scratch/               # Scratch/test scripts
+├── requirements.txt       # Root dependencies
+├── .env                   # Root environment variables
+└── README.md              # This file
 ```
 
 ---
 
-## 🛠️ Tech Stack
+## 🎯 Folder Organization
+
+The project is organized into **frontend** and **backend** folders for better separation of concerns:
+
+### **Frontend** (`/frontend`)
+- **Streamlit UI** application
+- Chat interface, wellness tracker, and onboarding flows
+- Communicates with backend via REST API calls
+
+### **Backend** (`/backend`)
+- **FastAPI REST API** server
+- Google OAuth authentication
+- Chatbot logic and LLM integration
+- Database CRUD operations
+- All AI tools (fitness, medication, nutrition, etc.)
+- External API integrations (Google Calendar, MedlinePlus)
+
+**Benefits:**
+✅ Clear separation of concerns (UI vs. logic)
+✅ Easier to scale services independently
+✅ Cleaner dependency management
+✅ Simplified deployment (containerization-ready)
+✅ Better code organization and maintainability
+
+---
 
 | Layer | Technology |
 |-------|-----------|
@@ -149,26 +190,64 @@ HealthCareAGENT/
 
 ## ⚡ Quick Start
 
+### Prerequisites
+- Python 3.11+
+- Virtual environment (venv or conda)
+- Git
+
+### Setup
+
 ```bash
 # 1. Clone the repo
 git clone https://github.com/CoderxHarsh/healthcare-agent.git
-cd healthcare-agent
+cd HealthCareAGENT
 
 # 2. Create virtual environment
 python -m venv .venv
 .venv\Scripts\activate  # Windows
+# or
+source .venv/bin/activate  # macOS/Linux
 
-# 3. Install dependencies
+# 3. Install dependencies (from root)
 pip install -r requirements.txt
 
-# 4. Set up .env file with:
-#    GROK_API_KEY, DATABASE_URL, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI
+# 4. Configure environment variables
+# Create/update .env file in root, frontend/, and backend/ with:
+#    - GROK_API_KEY (Groq API key)
+#    - GOOGLE_API_KEY (Google API key)
+#    - GOOGLE_CLIENT_ID (OAuth Client ID)
+#    - GOOGLE_CLIENT_SECRET (OAuth Client Secret)
+#    - GOOGLE_REDIRECT_URI (http://localhost:8000/auth/callback)
+#    - DATABASE_URL (PostgreSQL connection string)
+```
 
-# 5. Start FastAPI backend
-uvicorn api:app --reload
+### Running the Application
 
-# 6. Start Streamlit frontend (in another terminal)
+**Option 1: Run both Backend and Frontend (separate terminals)**
+
+```bash
+# Terminal 1: Start FastAPI backend
+cd backend
+uvicorn api:app --reload --port 8000
+
+# Terminal 2: Start Streamlit frontend
+cd frontend
 streamlit run app.py
 ```
+
+**Option 2: Run from root directory**
+
+```bash
+# Terminal 1: Backend
+python -m uvicorn backend.api:app --reload --port 8000
+
+# Terminal 2: Frontend
+streamlit run frontend/app.py
+```
+
+### Access the Application
+- **Frontend (Streamlit):** `http://localhost:8501`
+- **Backend API (FastAPI):** `http://localhost:8000`
+- **API Docs (Swagger):** `http://localhost:8000/docs`
 
 ---
