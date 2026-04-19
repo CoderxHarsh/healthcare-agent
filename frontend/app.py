@@ -21,17 +21,46 @@ from data_parser import HealthMetricParser
 import requests
 # datetime - Date/time operations for health tracking
 from datetime import datetime, timedelta, date
+# urllib.parse - URL encoding for OAuth parameters
+import urllib.parse
+# dotenv - Load environment variables
+from dotenv import load_dotenv, find_dotenv
 
 # ============================================
 # PAGE CONFIG & SETUP
 # ============================================
 st.set_page_config(
     page_title="HealthCare AI",
-    page_icon="🏥",
+    page_icon="\U0001f3e5",
     layout="wide"
 )
 
-API_BASE_URL = "http://localhost:8000"
+# Load environment variables
+env_path = find_dotenv() or os.path.join(os.path.dirname(__file__), '..', '.env')
+load_dotenv(env_path)
+
+API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000")
+
+# Google OAuth config
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
+GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
+GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI", "http://localhost:8501")
+GOOGLE_AUTH_ENDPOINT = "https://accounts.google.com/o/oauth2/v2/auth"
+GOOGLE_TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token"
+GOOGLE_USERINFO_ENDPOINT = "https://www.googleapis.com/oauth2/v2/userinfo"
+
+
+def get_google_login_url():
+    """Build the Google OAuth2 authorization URL"""
+    params = {
+        "client_id": GOOGLE_CLIENT_ID,
+        "redirect_uri": GOOGLE_REDIRECT_URI,
+        "response_type": "code",
+        "scope": "openid email profile https://www.googleapis.com/auth/calendar",
+        "access_type": "offline",
+        "prompt": "consent",
+    }
+    return f"{GOOGLE_AUTH_ENDPOINT}?{urllib.parse.urlencode(params)}"
 
 # -------------------------
 # SESSION SETUP
@@ -59,12 +88,67 @@ if "health_logs" not in st.session_state:
 
 
 # -------------------------
-# CHECK LOGIN (FROM FASTAPI REDIRECT)
+# CHECK LOGIN (FROM OAUTH CALLBACK)
 # -------------------------
 params = st.query_params
 
-# FastAPI sends: ?user=name&onboarded=true/false&user_id=123
-if "user" in params:
+# Handle Google OAuth callback — exchange code for token
+if "code" in params and not st.session_state.user:
+    code = params["code"]
+    try:
+        # Exchange authorization code for access token
+        token_data = {
+            "code": code,
+            "client_id": GOOGLE_CLIENT_ID,
+            "client_secret": GOOGLE_CLIENT_SECRET,
+            "redirect_uri": GOOGLE_REDIRECT_URI,
+            "grant_type": "authorization_code",
+        }
+        token_response = requests.post(GOOGLE_TOKEN_ENDPOINT, data=token_data, timeout=30)
+
+        if token_response.status_code == 200:
+            tokens = token_response.json()
+            access_token = tokens.get("access_token")
+            refresh_token = tokens.get("refresh_token")
+
+            # Get user info from Google
+            headers = {"Authorization": f"Bearer {access_token}"}
+            userinfo_response = requests.get(GOOGLE_USERINFO_ENDPOINT, headers=headers, timeout=30)
+
+            if userinfo_response.status_code == 200:
+                userinfo = userinfo_response.json()
+
+                # Save/update user in backend database
+                save_response = requests.post(
+                    f"{API_BASE_URL}/auth/google-login",
+                    json={
+                        "google_sub": userinfo.get("id"),
+                        "email": userinfo.get("email"),
+                        "name": userinfo.get("name"),
+                        "picture": userinfo.get("picture"),
+                        "refresh_token": refresh_token,
+                    },
+                    timeout=10,
+                )
+
+                if save_response.status_code == 200:
+                    user_data = save_response.json()
+                    st.session_state.user = user_data["name"]
+                    st.session_state.user_id = user_data["user_id"]
+                    st.session_state.onboarded = str(user_data["is_onboarded"]).lower()
+                    st.query_params.clear()
+                    st.rerun()
+                else:
+                    st.error(f"Failed to save user: {save_response.text}")
+            else:
+                st.error("Failed to get user info from Google")
+        else:
+            st.error(f"Google token exchange failed: {token_response.text}")
+    except Exception as e:
+        st.error(f"OAuth error: {str(e)}")
+
+# Legacy support: FastAPI redirect with user params
+elif "user" in params:
     st.session_state.user = params["user"]
     st.session_state.onboarded = params.get("onboarded", "false")
     try:
@@ -701,7 +785,7 @@ else:
         - **Access your health history** anytime
         - **Receive insights** based on your data
         """)
-        st.link_button("🔗 Login with Google", "http://127.0.0.1:8000/login", use_container_width=True)
+        st.link_button("\U0001f517 Login with Google", get_google_login_url(), use_container_width=True)
         st.stop()
     
     # GUEST MODE
