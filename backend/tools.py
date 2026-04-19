@@ -18,6 +18,20 @@ from typing import Optional, Dict, Tuple
 
 
 # ============================================
+# GLOBAL BEHAVIOR RULES (injected into every tool)
+# ============================================
+
+GLOBAL_BEHAVIOR_RULES = [
+    "",
+    "GLOBAL BEHAVIOR RULES (ALWAYS FOLLOW):",
+    "- NEVER ask clarifying questions. Answer directly with available information.",
+    "- If profile data is missing, state your assumption briefly and proceed.",
+    "- Do not wait for more details — give a complete, structured answer immediately.",
+    "- Keep responses concise, actionable, and easy to read.",
+]
+
+
+# ============================================
 # HELPER: BMI + Caloric Calculations
 # ============================================
 
@@ -64,7 +78,6 @@ def estimate_tdee(bmr: float, fitness_level: str) -> float:
 # TOPIC DETECTION (keyword-based router)
 # ============================================
 
-# Patterns for each domain
 TOPIC_PATTERNS = {
     "fitness": re.compile(
         r"\b(exercise|workout|gym|cardio|strength|stretch|yoga|run|running|jog|"
@@ -116,7 +129,6 @@ def detect_topic(user_input: str) -> str:
         matches = pattern.findall(user_input)
         scores[topic] = len(matches)
 
-    # Only pick a topic if there's at least 1 keyword match
     if not scores or max(scores.values()) == 0:
         return "general"
 
@@ -133,10 +145,10 @@ def fitness_tool(user_input: str, profile: Optional[Dict] = None) -> str:
         "🏋️ ACTIVE TOOL: FITNESS ADVISOR",
         "You are now acting as a certified fitness advisor.",
         "Provide safe, personalized exercise recommendations.",
+        "Answer directly without asking follow-up questions.",
     ]
 
     if profile:
-        # Add computed metrics
         weight = profile.get("weight_kg")
         height = profile.get("height_cm")
         age = profile.get("age")
@@ -151,7 +163,6 @@ def fitness_tool(user_input: str, profile: Optional[Dict] = None) -> str:
 
         if fitness_level:
             context_parts.append(f"Current fitness level: {fitness_level}")
-            # Tailor intensity
             intensity_map = {
                 "sedentary": "Start with very gentle, low-impact exercises. 10-15 min sessions.",
                 "light": "Recommend light to moderate exercises. 20-30 min sessions.",
@@ -172,6 +183,12 @@ def fitness_tool(user_input: str, profile: Optional[Dict] = None) -> str:
         if goals:
             context_parts.append(f"User's goals: {goals}. Tailor exercises toward these goals.")
 
+    else:
+        context_parts.append(
+            "No profile available. Assume a moderately healthy adult. "
+            "Provide general beginner-to-intermediate recommendations."
+        )
+
     context_parts.extend([
         "",
         "RULES:",
@@ -182,6 +199,7 @@ def fitness_tool(user_input: str, profile: Optional[Dict] = None) -> str:
         "- Recommend rest days and recovery practices.",
     ])
 
+    context_parts.extend(GLOBAL_BEHAVIOR_RULES)
     return "\n".join(context_parts)
 
 
@@ -191,6 +209,7 @@ def medication_tool(user_input: str, profile: Optional[Dict] = None) -> str:
         "💊 ACTIVE TOOL: MEDICATION ADVISOR",
         "You are now acting as a medication information assistant.",
         "Provide factual drug information but NEVER prescribe or change dosages.",
+        "Answer directly without asking follow-up questions.",
     ]
 
     if profile:
@@ -216,6 +235,12 @@ def medication_tool(user_input: str, profile: Optional[Dict] = None) -> str:
                 "Consider contraindications for these conditions."
             )
 
+    else:
+        context_parts.append(
+            "No profile available. Provide general medication information. "
+            "Flag that interactions cannot be checked without a medication list."
+        )
+
     context_parts.extend([
         "",
         "RULES:",
@@ -227,6 +252,7 @@ def medication_tool(user_input: str, profile: Optional[Dict] = None) -> str:
         "- If the user asks about changing/stopping medication, strongly advise consulting their doctor.",
     ])
 
+    context_parts.extend(GLOBAL_BEHAVIOR_RULES)
     return "\n".join(context_parts)
 
 
@@ -236,6 +262,7 @@ def nutrition_tool(user_input: str, profile: Optional[Dict] = None) -> str:
         "🥗 ACTIVE TOOL: NUTRITION ADVISOR",
         "You are now acting as a certified nutrition advisor.",
         "Provide dietary advice tailored to the user's profile and goals.",
+        "Answer directly without asking follow-up questions.",
     ]
 
     if profile:
@@ -285,6 +312,12 @@ def nutrition_tool(user_input: str, profile: Optional[Dict] = None) -> str:
         if goals:
             context_parts.append(f"User's goals: {goals}. Align meal suggestions with these goals.")
 
+    else:
+        context_parts.append(
+            "No profile available. Assume a moderately active adult with no known conditions. "
+            "Provide general balanced nutrition advice."
+        )
+
     context_parts.extend([
         "",
         "RULES:",
@@ -296,6 +329,7 @@ def nutrition_tool(user_input: str, profile: Optional[Dict] = None) -> str:
         "- If the user has diabetes, always consider glycemic index.",
     ])
 
+    context_parts.extend(GLOBAL_BEHAVIOR_RULES)
     return "\n".join(context_parts)
 
 
@@ -305,6 +339,7 @@ def medical_research_tool(user_input: str, profile: Optional[Dict] = None) -> st
         "🔬 ACTIVE TOOL: MEDICAL RESEARCH ADVISOR",
         "You are now acting as a medical research information assistant.",
         "Provide evidence-based, factual health information from established guidelines.",
+        "Answer directly without asking follow-up questions.",
     ]
 
     if profile:
@@ -324,6 +359,11 @@ def medical_research_tool(user_input: str, profile: Optional[Dict] = None) -> st
         if gender:
             context_parts.append(f"User's gender: {gender}. Consider gender-specific health research.")
 
+    else:
+        context_parts.append(
+            "No profile available. Provide general population-level research and guidelines."
+        )
+
     context_parts.extend([
         "",
         "RULES:",
@@ -336,6 +376,7 @@ def medical_research_tool(user_input: str, profile: Optional[Dict] = None) -> st
         "- If asked about very recent research, clarify that your knowledge has a cutoff date.",
     ])
 
+    context_parts.extend(GLOBAL_BEHAVIOR_RULES)
     return "\n".join(context_parts)
 
 
@@ -345,6 +386,7 @@ def symptoms_tool(user_input: str, profile: Optional[Dict] = None) -> str:
         "🩺 ACTIVE TOOL: SYMPTOM CHECKER",
         "You are now acting as a symptom assessment assistant.",
         "Help the user understand possible causes and urgency level.",
+        "Answer directly without asking follow-up questions.",
     ]
 
     if profile:
@@ -352,7 +394,6 @@ def symptoms_tool(user_input: str, profile: Optional[Dict] = None) -> str:
         gender = profile.get("gender")
         conditions = profile.get("health_conditions", "")
         medications = profile.get("medications", "")
-        allergies = profile.get("allergies", "")
 
         if age:
             context_parts.append(f"User's age: {age}. Consider age-related risk factors.")
@@ -373,10 +414,17 @@ def symptoms_tool(user_input: str, profile: Optional[Dict] = None) -> str:
                 "Consider whether symptoms could be medication side effects."
             )
 
+    else:
+        context_parts.append(
+            "No profile available. Assume a general adult. "
+            "Provide standard symptom assessment without personalization."
+        )
+
     context_parts.extend([
         "",
         "RULES:",
-        "- Ask clarifying questions: duration, severity (1-10), location, triggers.",
+        # ✅ FIX: Removed 'ask clarifying questions' — now assumes moderate/recent onset
+        "- If duration or severity is unknown, assume moderate severity and recent onset. Proceed with assessment.",
         "- Provide a structured assessment:",
         "  • Possible causes (most likely first)",
         "  • Urgency level: 🟢 Mild / 🟡 Moderate / 🔴 Urgent",
@@ -388,6 +436,7 @@ def symptoms_tool(user_input: str, profile: Optional[Dict] = None) -> str:
         "- Always recommend consulting a doctor for persistent or worsening symptoms.",
     ])
 
+    context_parts.extend(GLOBAL_BEHAVIOR_RULES)
     return "\n".join(context_parts)
 
 
@@ -427,7 +476,7 @@ TOOLS = {
 def get_tool_context(user_input: str, profile: Optional[Dict] = None) -> Tuple[str, str]:
     """
     Detect the topic and run the appropriate tool.
-    
+
     Returns:
         (tool_context, tool_name) - the enriched context string and which tool was used.
         tool_name is 'general' if no specific tool matched.
