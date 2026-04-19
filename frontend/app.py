@@ -282,10 +282,10 @@ def show_onboarding_page():
                         
                         if response2.status_code == 200:
                             st.session_state.onboarded = "true"
+                            st.session_state.page = "chat"
+                            st.query_params.clear()
                             st.success("✅ Onboarding completed successfully!")
                             st.balloons()
-                            st.markdown("---")
-                            st.write("Redirecting to dashboard...")
                             st.rerun()
                         else:
                             st.error(f"❌ Error completing onboarding: {response2.json()}")
