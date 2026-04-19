@@ -95,6 +95,7 @@ params = st.query_params
 # Handle Google OAuth callback — exchange code for token
 if "code" in params and not st.session_state.user:
     code = params["code"]
+    st.info("🔄 Processing OAuth callback... (1/3)")
     try:
         # Exchange authorization code for access token
         token_data = {
@@ -104,6 +105,7 @@ if "code" in params and not st.session_state.user:
             "redirect_uri": GOOGLE_REDIRECT_URI,
             "grant_type": "authorization_code",
         }
+        st.write("📝 Exchanging authorization code for tokens...")
         token_response = requests.post(GOOGLE_TOKEN_ENDPOINT, data=token_data, timeout=30)
 
         if token_response.status_code == 200:
@@ -113,12 +115,14 @@ if "code" in params and not st.session_state.user:
 
             # Get user info from Google
             headers = {"Authorization": f"Bearer {access_token}"}
+            st.write("👤 Retrieving Google user info...")
             userinfo_response = requests.get(GOOGLE_USERINFO_ENDPOINT, headers=headers, timeout=30)
 
             if userinfo_response.status_code == 200:
                 userinfo = userinfo_response.json()
 
                 # Save/update user in backend database
+                st.write("💾 Saving user to backend database...")
                 save_response = requests.post(
                     f"{API_BASE_URL}/auth/google-login",
                     json={
@@ -136,6 +140,7 @@ if "code" in params and not st.session_state.user:
                     st.session_state.user = user_data["name"]
                     st.session_state.user_id = user_data["user_id"]
                     st.session_state.onboarded = str(user_data["is_onboarded"]).lower()
+                    st.write("✅ Login successful! Redirecting...")
                     st.query_params.clear()
                     st.rerun()
                 else:
@@ -342,34 +347,36 @@ if st.session_state.user:
         if page == "💬 Chat":
             st.divider()
 
-            # Fetch and cache the user's health profile for personalized responses
+            # Debug: Show loading status
             if "user_profile" not in st.session_state or st.session_state.user_profile is None:
-                try:
-                    profile_response = requests.get(
-                        f"{API_BASE_URL}/user/{st.session_state.user_id}/profile",
-                        timeout=5
-                    )
-                    if profile_response.status_code == 200:
-                        st.session_state.user_profile = profile_response.json().get("profile", {})
-                    else:
+                with st.spinner("📚 Loading your health profile..."):
+                    try:
+                        profile_response = requests.get(
+                            f"{API_BASE_URL}/user/{st.session_state.user_id}/profile",
+                            timeout=5
+                        )
+                        if profile_response.status_code == 200:
+                            st.session_state.user_profile = profile_response.json().get("profile", {})
+                        else:
+                            st.session_state.user_profile = {}
+                    except Exception:
                         st.session_state.user_profile = {}
-                except Exception:
-                    st.session_state.user_profile = {}
 
             # Fetch and cache recent health logs for context-aware responses
             if "health_logs" not in st.session_state or st.session_state.health_logs is None:
-                try:
-                    logs_response = requests.get(
-                        f"{API_BASE_URL}/health-logs/{st.session_state.user_id}",
-                        params={"days": 30},
-                        timeout=5
-                    )
-                    if logs_response.status_code == 200:
-                        st.session_state.health_logs = logs_response.json().get("logs", [])
-                    else:
+                with st.spinner("📊 Loading your health logs..."):
+                    try:
+                        logs_response = requests.get(
+                            f"{API_BASE_URL}/health-logs/{st.session_state.user_id}",
+                            params={"days": 30},
+                            timeout=5
+                        )
+                        if logs_response.status_code == 200:
+                            st.session_state.health_logs = logs_response.json().get("logs", [])
+                        else:
+                            st.session_state.health_logs = []
+                    except Exception:
                         st.session_state.health_logs = []
-                except Exception:
-                    st.session_state.health_logs = []
 
             for msg in st.session_state.messages:
                 st.chat_message(msg["role"]).write(msg["content"])
