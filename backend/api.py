@@ -11,6 +11,7 @@ from fastapi import FastAPI, Request, HTTPException, Depends
 from fastapi.responses import HTMLResponse, RedirectResponse
 # Pydantic - Data validation and serialization
 from pydantic import BaseModel
+from typing import Optional
 # os - Environment variable and path handling
 import os
 # urllib.parse - URL encoding for OAuth parameters
@@ -53,6 +54,19 @@ from google_calendar import create_medication_reminder, delete_medication_remind
 from pdf_generator import generate_health_report_pdf, format_report_data
 
 app = FastAPI()
+
+# CORS middleware — allow Streamlit Cloud (and localhost) to call this API
+from fastapi.middleware.cors import CORSMiddleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:8501",
+        "https://healthcare-agent-nuurhq4dt28vzlr5jeypa2.streamlit.app",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # ============================================
 # STARTUP & SHUTDOWN OPERATIONS
@@ -242,6 +256,40 @@ async def profile(request: Request):
 
 
 # ============================================
+# STREAMLIT OAUTH — user upsert endpoint
+# ============================================
+
+class GoogleLoginData(BaseModel):
+    google_sub: str
+    email: str
+    name: Optional[str] = None
+    picture: Optional[str] = None
+    refresh_token: Optional[str] = None
+
+
+@app.post("/auth/google-login")
+async def google_login(data: GoogleLoginData, db: AsyncSession = Depends(get_db)):
+    """Accept user info from Streamlit OAuth flow and upsert into the database"""
+    try:
+        user = await upsert_user(
+            db,
+            google_sub=data.google_sub,
+            email=data.email,
+            name=data.name,
+            picture=data.picture,
+            refresh_token=data.refresh_token,
+        )
+        return {
+            "user_id": user.id,
+            "name": user.name or "User",
+            "email": user.email,
+            "is_onboarded": user.is_onboarded,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to save user: {str(e)}")
+
+
+# ============================================
 # PYDANTIC MODELS - Data validation for health logs
 # ============================================
 
@@ -423,15 +471,15 @@ async def get_summary(
 # ============================================
 
 class OnboardingData(BaseModel):
-    age: int = None
-    gender: str = None
-    height_cm: float = None
-    weight_kg: float = None
-    health_conditions: str = None
-    medications: str = None
-    allergies: str = None
-    fitness_level: str = None
-    health_goals: str = None
+    age: Optional[int] = None
+    gender: Optional[str] = None
+    height_cm: Optional[float] = None
+    weight_kg: Optional[float] = None
+    health_conditions: Optional[str] = None
+    medications: Optional[str] = None
+    allergies: Optional[str] = None
+    fitness_level: Optional[str] = None
+    health_goals: Optional[str] = None
 
 
 @app.get("/onboarding")
