@@ -49,6 +49,8 @@ from models import User
 from data_parser import HealthMetricParser
 # Google Calendar integration - Create/delete medication reminders
 from google_calendar import create_medication_reminder, delete_medication_reminder
+# PDF Generation - Create health report PDFs
+from pdf_generator import generate_health_report_pdf, format_report_data
 
 app = FastAPI()
 
@@ -714,3 +716,109 @@ async def medication_adherence(
         }
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+# ============================================
+# EXPORT ENDPOINTS - Generate PDF reports
+# ============================================
+
+from fastapi.responses import FileResponse
+import tempfile
+
+@app.get("/export/health-report/{user_id}")
+async def export_health_report(
+    user_id: int,
+    days: int = 30,
+    db: AsyncSession = Depends(get_db)
+):
+    """Generate and download a PDF health report"""
+    try:
+        # Get user profile
+        user = await get_user_profile(db, user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        # Get health logs
+        health_logs_data = await get_user_health_logs(db, user_id, days=days)
+        health_logs = [
+            {
+                "id": log.id,
+                "metric_type": log.metric_type,
+                "value": log.value,
+                "unit": log.unit,
+                "notes": log.notes,
+                "created_at": log.created_at.isoformat(),
+                "source": log.source
+            }
+            for log in health_logs_data
+        ]
+        
+        # Get medications
+        meds_data = await get_user_medications(db, user_id, active_only=False)
+        medications = [
+            {
+                "id": med.id,
+                "name": med.name,
+                "dosage": med.dosage,
+                "frequency": med.frequency,
+                "time_of_day": med.time_of_day,
+                "start_date": med.start_date.isoformat() if med.start_date else None,
+                "end_date": med.end_date.isoformat() if med.end_date else None,
+                "notes": med.notes,
+                "is_active": med.is_active,
+            }
+            for med in meds_data
+        ]
+        
+        # Get adherence stats
+        adherence_stats = await get_adherence_stats(db, user_id, days=days)
+        adherence_dict = {
+            med_id: {
+                'adherence_rate': stats.get('adherence_rate', 0)
+            }
+            for med_id, stats in adherence_stats.get('medications', {}).items()
+        }
+        
+        # Format user profile for report
+        user_profile = {
+            'name': user.name or 'User',
+            'age': user.age,
+            'gender': user.gender,
+            'height_cm': user.height_cm,
+            'weight_kg': user.weight_kg,
+            'health_conditions': user.health_conditions or '',
+            'medications': user.medications or '',
+            'allergies': user.allergies or '',
+            'fitness_level': user.fitness_level or 'Not specified',
+            'health_goals': user.health_goals or '',
+        }
+        
+        # Format data for PDF generation
+        report_data = format_report_data(
+            user_profile=user_profile,
+            health_logs=health_logs,
+            medications=medications,
+            adherence_stats=adherence_dict
+        )
+        
+        # Generate PDF
+        pdf_data = generate_health_report_pdf(report_data)
+        
+        # Save to temporary file for download
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp:
+            tmp.write(pdf_data.getvalue())
+            tmp_path = tmp.name
+        
+        return FileResponse(
+            tmp_path,
+            media_type="application/pdf",
+            filename=f"health_report_{user.name.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+        )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error generating health report: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=400, detail=f"Failed to generate report: {str(e)}")

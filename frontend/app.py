@@ -221,7 +221,7 @@ if st.session_state.user:
         show_onboarding_page()
     else:
         # ✅ USER IS LOGGED IN AND ONBOARDED - Show main app
-        col1, col2, col3 = st.columns([2, 1, 1])
+        col1, col2, col3, col4 = st.columns([2, 1, 1, 1])
         with col1:
             st.title("🏥 HealthCare AI Assistant")
         with col2:
@@ -231,7 +231,15 @@ if st.session_state.user:
         with col3:
             st.write("")
             st.write("")
-            if st.button("Logout"):
+            st.link_button(
+                "📥 PDF Report",
+                f"{API_BASE_URL}/export/health-report/{st.session_state.user_id}",
+                use_container_width=True
+            )
+        with col4:
+            st.write("")
+            st.write("")
+            if st.button("Logout", use_container_width=True):
                 st.session_state.user = None
                 st.session_state.user_id = None
                 st.session_state.user_profile = None
@@ -321,7 +329,7 @@ if st.session_state.user:
 
         elif page == "📊 Wellness Tracker":
             st.header("📊 Your Wellness Tracker")
-            
+
             # Tabs for different views
             tab1, tab2, tab3 = st.tabs(["📈 View Logs", "➕ Add Metric", "📋 Summary"])
             
