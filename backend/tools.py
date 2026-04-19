@@ -424,7 +424,7 @@ def symptoms_tool(user_input: str, profile: Optional[Dict] = None) -> str:
         "",
         "RULES:",
         # ✅ FIX: Removed 'ask clarifying questions' — now assumes moderate/recent onset
-        "- If duration or severity is unknown, assume moderate severity and recent onset. Proceed with assessment.",
+        "- NEVER ask about duration or severity. Always assume moderate severity and recent onset and give the full assessment immediately.",
         "- Provide a structured assessment:",
         "  • Possible causes (most likely first)",
         "  • Urgency level: 🟢 Mild / 🟡 Moderate / 🔴 Urgent",

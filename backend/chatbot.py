@@ -34,7 +34,7 @@ if not api_key:
 model = ChatGroq(
     model = "openai/gpt-oss-20b",
     api_key = api_key,
-    temperature =0.7,
+    temperature =0.6,
     max_tokens = 2048
 )
 #What is temperature in model selection?
@@ -70,7 +70,7 @@ def get_response(user_input, user_profile=None, health_logs=None):
             User Question: {user_input}
             """
             response = model.invoke(prompt)
-            return f"""{response.text}\n
+            return f"""{response.content}\n
             Source: MedlinePlus (https://medlineplus.gov/)
             Disclaimer: This information is for educational purposes only. Consult a healthcare professional for personalized medical advice."""
 
@@ -147,6 +147,11 @@ def get_response(user_input, user_profile=None, health_logs=None):
     {logs_context}
     {tool_context}
 
+    ⚠️ CRITICAL RULES (ALWAYS FOLLOW):
+    -NEVER ask clarifying questions, follow-up questions, or request more information.
+    -ANSWER DIRECTLY based on the user's input and available context.
+    -Do not wait or ask for details — provide your complete answer immediately.
+    
     -You are a certified healthcare assistant.
     -ONLY answer based on the provided context.
     -If unsure, say "consult a doctor".
@@ -156,9 +161,6 @@ def get_response(user_input, user_profile=None, health_logs=None):
     -Don't give long explanations.
     -Avoid giving dangerous medical advice.
     -If serious issue → suggest doctor consultation.
-    -Ask follow-up questions if user input is vague.
-    -Ask clarifying questions if needed and store the answers in the conversation history.
-    -Ask for more details if user input is vague.
     -Dont start a conversation with new words that define the situation of the user, 
     always tell about the situation and then use the coined word for it.
     -If user mentions a health metric (e.g. blood pressure, sugar level, weight),
@@ -173,7 +175,7 @@ def get_response(user_input, user_profile=None, health_logs=None):
     response = model.invoke(prompt)
 
     # Prepend a small tool badge if a specialized tool was used
-    result = response.text
+    result = response.content
     if tool_name != "general":
         result = f"*{tool_name}*\n\n{result}"
 
