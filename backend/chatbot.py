@@ -44,7 +44,29 @@ model = ChatGroq(
 Robotic                 Balanced                  Chaotic
 Always picks          Mix of safe +            Very random,
 safest answer          creative                unpredictable"""
-def get_response(user_input, user_profile=None, health_logs=None):
+def get_response(user_input, user_profile=None, health_logs=None, chat_history=None):
+
+    # --- BUILD CONVERSATION HISTORY ---
+    # Include recent messages so the LLM has context for follow-up questions
+    history_context = ""
+    if chat_history:
+        # Keep last 10 messages (5 exchanges) to stay within token limits
+        recent = chat_history[-10:]
+        history_lines = []
+        for msg in recent:
+            role = "User" if msg["role"] == "user" else "Assistant"
+            # Truncate very long messages to save tokens
+            content = msg["content"][:500]
+            history_lines.append(f"{role}: {content}")
+
+        if history_lines:
+            history_context = (
+                "\n\n--- CONVERSATION HISTORY ---\n"
+                + "\n".join(history_lines)
+                + "\n--- END HISTORY ---\n\n"
+                "The above is the recent conversation. Use it to understand context. "
+                "The user's latest message below may be a follow-up to this conversation.\n"
+            )
 
     # -------------------------------
     # 🧠 STEP 1: Try MedlinePlus FIRST
@@ -56,9 +78,9 @@ def get_response(user_input, user_profile=None, health_logs=None):
 
         if med_data:
             clean_text = clean_html(med_data['summary'])
-            prompt = f"""Explain the follwoing medical information in simple clear terms.
+            prompt = f"""Explain the following medical information in simple clear terms.
             keep it :
-            - Sort(5-6 lines)
+            - Short (5-6 lines)
             - easy to understand (avoid medical jargon)
             - actionable (what can the user do with this info)
             - safe (avoid giving dangerous advice)
@@ -66,6 +88,7 @@ def get_response(user_input, user_profile=None, health_logs=None):
 
             Medicinal Info:
             {clean_text}
+            {history_context}
 
             User Question: {user_input}
             """
@@ -137,9 +160,11 @@ def get_response(user_input, user_profile=None, health_logs=None):
                 "Do NOT dump the entire log back unless the user asks to see it.\n"
             )
 
-    # --- TOOL ROUTING ---
-    # Detect the topic and get specialized tool context
-    tool_context, tool_name = get_tool_context(user_input, user_profile)
+    # (Conversation history generation moved to the top)
+
+    # --- TOOL ROUTING (history-aware) ---
+    # Detect the topic from the current message AND recent history
+    tool_context, tool_name = get_tool_context(user_input, user_profile, chat_history)
 
     # Build a guest-mode hint when no profile is available
     guest_hint = ""
@@ -156,12 +181,13 @@ def get_response(user_input, user_profile=None, health_logs=None):
     - NEVER write "Could you tell me...", "Can you share...", "What is your...", "Tell me about...", "Do you have..." or ANY request for information.
     - NEVER list questions for the user to answer.
     - NEVER suggest the user provide more details.
-    - ANSWER DIRECTLY AND IMMEDIATELY based ONLY on what the user said.
+    - ANSWER DIRECTLY AND IMMEDIATELY based on the user's input, profile, and conversation history.
     - Make reasonable assumptions where needed and state them briefly.
     {guest_hint}
     You are a helpful, certified healthcare assistant.
     {profile_context}
     {logs_context}
+    {history_context}
     {tool_context}
 
     GENERAL GUIDELINES:

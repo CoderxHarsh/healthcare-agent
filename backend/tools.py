@@ -475,22 +475,70 @@ TOOLS = {
 }
 
 
-def get_tool_context(user_input: str, profile: Optional[Dict] = None) -> Tuple[str, str]:
+def get_tool_context(user_input: str, profile: Optional[Dict] = None, chat_history=None) -> Tuple[str, str]:
     """
     Detect the topic and run the appropriate tool.
+    Uses conversation history to maintain tool continuity for follow-up messages.
 
     Returns:
         (tool_context, tool_name) - the enriched context string and which tool was used.
         tool_name is 'general' if no specific tool matched.
     """
     topic = detect_topic(user_input)
+    is_followup = False
+
+    # --- HISTORY-AWARE ROUTING ---
+    # If the current message has a weak match (0-1 keyword hits), check whether
+    # the recent conversation was using a specific tool and stick with it.
+    if chat_history and len(chat_history) >= 2:
+        # Count how strong the current match is
+        current_scores = {}
+        for t, pattern in TOPIC_PATTERNS.items():
+            current_scores[t] = len(pattern.findall(user_input))
+        current_max = max(current_scores.values()) if current_scores else 0
+
+        # Only override if the current match is weak (0 or 1 keyword)
+        if current_max <= 1:
+            # Look at recent USER messages to find the dominant topic
+            recent_user_msgs = [
+                m["content"] for m in chat_history[-6:]
+                if m["role"] == "user"
+            ]
+            if recent_user_msgs:
+                combined_history = " ".join(recent_user_msgs)
+                history_topic = detect_topic(combined_history)
+
+                # If the conversation history has a clear topic, use it
+                if history_topic != "general":
+                    topic = history_topic
+                    is_followup = True
 
     if topic == "general":
         return ("", "general")
 
     tool_info = TOOLS[topic]
+    tool_name = f"{tool_info['emoji']} {tool_info['name']}"
+
+    if is_followup:
+        # --- FOLLOW-UP MODE ---
+        # Don't inject the full rigid tool template (which forces a complete
+        # assessment). Instead, give a lightweight prompt so the LLM answers
+        # the specific follow-up question naturally using conversation context.
+        followup_context_parts = [
+            f"{tool_info['emoji']} ACTIVE TOOL: {tool_info['name'].upper()} (FOLLOW-UP MODE)",
+            "",
+            "The user is asking a FOLLOW-UP question related to the ongoing conversation.",
+            "ANSWER THEIR SPECIFIC QUESTION directly, concisely, and naturally.",
+            "Do NOT repeat a full assessment or re-diagnose from scratch.",
+            "Reference the conversation history to give a contextual answer.",
+            "Keep it short and helpful — the user already has the initial assessment.",
+        ]
+        followup_context_parts.extend(GLOBAL_BEHAVIOR_RULES)
+        return ("\n".join(followup_context_parts), tool_name)
+
+    # --- FULL MODE ---
+    # First message on this topic — run the complete tool template
     tool_fn = tool_info["function"]
     tool_context = tool_fn(user_input, profile)
-    tool_name = f"{tool_info['emoji']} {tool_info['name']}"
 
     return (tool_context, tool_name)
