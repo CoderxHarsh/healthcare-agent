@@ -15,6 +15,3 @@ asyncpg # for async PostgreSQL support
 psycopg2-binary  # for PostgreSQL support
 
 pandas # for data manipulation and analysis
-weasyprint # for HTML to PDF conversion
-jinja2 # for HTML templating
-fpdf2 # for PDF generation (Windows-compatible)
