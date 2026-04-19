@@ -296,11 +296,12 @@ if st.session_state.user:
                 st.session_state.messages.append({"role": "user", "content": user_input})
                 st.chat_message("user").write(user_input)
 
-                # Get response from chatbot WITH profile AND health logs
+                # Get response from chatbot WITH profile, health logs, AND chat history
                 response = get_response(
                     user_input,
                     user_profile=st.session_state.user_profile,
-                    health_logs=st.session_state.health_logs
+                    health_logs=st.session_state.health_logs,
+                    chat_history=st.session_state.messages
                 )
                 
                 # Extract and save any health metrics from the input
@@ -716,6 +717,6 @@ else:
         st.session_state.messages.append({"role": "user", "content": user_input})
         st.chat_message("user").write(user_input)
 
-        response = get_response(user_input)
+        response = get_response(user_input, chat_history=st.session_state.messages)
         st.session_state.messages.append({"role": "assistant", "content": response})
         st.chat_message("assistant").write(response)
