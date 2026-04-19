@@ -384,9 +384,17 @@ def symptoms_tool(user_input: str, profile: Optional[Dict] = None) -> str:
     """Generate symptom-assessment-specific context for the LLM prompt"""
     context_parts = [
         "🩺 ACTIVE TOOL: SYMPTOM CHECKER",
-        "You are now acting as a symptom assessment assistant.",
-        "Help the user understand possible causes and urgency level.",
-        "Answer directly without asking follow-up questions.",
+        "You are a symptom assessment assistant. Your job is to IMMEDIATELY provide a symptom assessment.",
+        "",
+        "⛔ ABSOLUTE RULES (DO NOT VIOLATE UNDER ANY CIRCUMSTANCE):",
+        "- DO NOT ask ANY questions whatsoever. NOT ONE QUESTION.",
+        "- DO NOT ask about severity, duration, or other symptoms.",
+        "- DO NOT ask clarifying questions.",
+        "- DO NOT ask for more details.",
+        "- DO NOT suggest the user tell you more information.",
+        "- Provide your COMPLETE assessment based ONLY on what the user already told you.",
+        "- Assume moderate severity and recent onset. Give the full assessment immediately.",
+        "",
     ]
 
     if profile:
@@ -396,44 +404,31 @@ def symptoms_tool(user_input: str, profile: Optional[Dict] = None) -> str:
         medications = profile.get("medications", "")
 
         if age:
-            context_parts.append(f"User's age: {age}. Consider age-related risk factors.")
+            context_parts.append(f"User age: {age} — consider age-related factors.")
 
         if gender:
-            context_parts.append(f"User's gender: {gender}. Consider gender-specific conditions.")
+            context_parts.append(f"User gender: {gender} — consider gender-specific factors.")
 
         if conditions:
             context_parts.append(
-                f"⚠️ EXISTING CONDITIONS: {conditions}. "
-                "Symptoms may be related to or worsened by these conditions. "
-                "Flag any concerning overlaps."
+                f"EXISTING CONDITIONS: {conditions} — flag any concerning overlaps with reported symptoms."
             )
 
         if medications:
             context_parts.append(
-                f"Current medications: {medications}. "
-                "Consider whether symptoms could be medication side effects."
+                f"MEDICATIONS: {medications} — note if symptoms could be side effects."
             )
-
-    else:
-        context_parts.append(
-            "No profile available. Assume a general adult. "
-            "Provide standard symptom assessment without personalization."
-        )
+        context_parts.append("")
 
     context_parts.extend([
+        "OUTPUT FORMAT (follow exactly):",
+        "1. Possible causes (most likely first)",
+        "2. Urgency: 🟢 Mild / 🟡 Moderate / 🔴 Urgent",
+        "3. Recommended next steps",
+        "4. Warning signs requiring emergency care",
         "",
-        "RULES:",
-        # ✅ FIX: Removed 'ask clarifying questions' — now assumes moderate/recent onset
-        "- NEVER ask about duration or severity. Always assume moderate severity and recent onset and give the full assessment immediately.",
-        "- Provide a structured assessment:",
-        "  • Possible causes (most likely first)",
-        "  • Urgency level: 🟢 Mild / 🟡 Moderate / 🔴 Urgent",
-        "  • Recommended next steps",
-        "- For ANY of these, say 'Seek emergency care immediately':",
-        "  chest pain, difficulty breathing, sudden severe headache,",
-        "  signs of stroke (FAST), heavy bleeding, loss of consciousness.",
-        "- NEVER provide a definitive diagnosis. Always say 'possible causes'.",
-        "- Always recommend consulting a doctor for persistent or worsening symptoms.",
+        "REMEMBER: You are PROVIDING AN ASSESSMENT, not gathering information.",
+        "The user gave you enough information. Analyze it and respond NOW.",
     ])
 
     context_parts.extend(GLOBAL_BEHAVIOR_RULES)
