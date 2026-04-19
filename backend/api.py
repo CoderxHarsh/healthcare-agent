@@ -753,10 +753,11 @@ async def export_health_report(
             for log in health_logs_data
         ]
         
-        # Get medications
+        # Get medications — split into active and past (soft-deleted)
         meds_data = await get_user_medications(db, user_id, active_only=False)
-        medications = [
-            {
+        
+        def _fmt_med(med):
+            return {
                 "id": med.id,
                 "name": med.name,
                 "dosage": med.dosage,
@@ -767,8 +768,9 @@ async def export_health_report(
                 "notes": med.notes,
                 "is_active": med.is_active,
             }
-            for med in meds_data
-        ]
+        
+        active_medications = [_fmt_med(m) for m in meds_data if m.is_active]
+        past_medications = [_fmt_med(m) for m in meds_data if not m.is_active]
         
         # Get adherence stats
         adherence_stats = await get_adherence_stats(db, user_id, days=days)
@@ -797,8 +799,9 @@ async def export_health_report(
         report_data = format_report_data(
             user_profile=user_profile,
             health_logs=health_logs,
-            medications=medications,
-            adherence_stats=adherence_dict
+            medications=active_medications,
+            adherence_stats=adherence_dict,
+            past_medications=past_medications
         )
         
         # Generate PDF
