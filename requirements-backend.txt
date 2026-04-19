@@ -1,0 +1,23 @@
+# Web framework
+fastapi[all]
+uvicorn
+
+# Auth
+python-jose[cryptography]
+python-dotenv
+requests
+
+# Database
+sqlalchemy
+asyncpg
+psycopg2-binary
+
+# Data & PDF
+pandas
+fpdf2
+jinja2
+
+# LLM
+google-generativeai
+langchain==0.3.14
+langchain-groq==0.2.3
