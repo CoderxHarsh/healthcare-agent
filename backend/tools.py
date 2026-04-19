@@ -23,10 +23,13 @@ from typing import Optional, Dict, Tuple
 
 GLOBAL_BEHAVIOR_RULES = [
     "",
-    "GLOBAL BEHAVIOR RULES (ALWAYS FOLLOW):",
-    "- NEVER ask clarifying questions. Answer directly with available information.",
-    "- If profile data is missing, state your assumption briefly and proceed.",
-    "- Do not wait for more details — give a complete, structured answer immediately.",
+    "⚠️ GLOBAL BEHAVIOR RULES (HIGHEST PRIORITY — ALWAYS FOLLOW):",
+    "- NEVER ask ANY questions. Do NOT ask clarifying, follow-up, or probing questions.",
+    "- NEVER say 'Could you tell me...', 'What is your...', 'Do you have...', or similar.",
+    "- NEVER request the user to provide more information, details, or context.",
+    "- If profile data is missing, silently assume reasonable defaults and proceed.",
+    "- Do not mention that profile data is missing or unavailable.",
+    "- Give a complete, structured answer immediately based ONLY on what the user said.",
     "- Keep responses concise, actionable, and easy to read.",
 ]
 
@@ -186,7 +189,8 @@ def fitness_tool(user_input: str, profile: Optional[Dict] = None) -> str:
     else:
         context_parts.append(
             "No profile available. Assume a moderately healthy adult. "
-            "Provide general beginner-to-intermediate recommendations."
+            "Provide general beginner-to-intermediate recommendations. "
+            "Do NOT ask the user for their profile, age, fitness level, or any personal details."
         )
 
     context_parts.extend([
@@ -238,7 +242,8 @@ def medication_tool(user_input: str, profile: Optional[Dict] = None) -> str:
     else:
         context_parts.append(
             "No profile available. Provide general medication information. "
-            "Flag that interactions cannot be checked without a medication list."
+            "Assume no known allergies or interactions. "
+            "Do NOT ask the user for their medication list, allergies, or any personal details."
         )
 
     context_parts.extend([
@@ -314,8 +319,9 @@ def nutrition_tool(user_input: str, profile: Optional[Dict] = None) -> str:
 
     else:
         context_parts.append(
-            "No profile available. Assume a moderately active adult with no known conditions. "
-            "Provide general balanced nutrition advice."
+            "No profile available. Assume a moderately active adult (~2000 kcal/day) with no known conditions. "
+            "Provide general balanced nutrition advice. "
+            "Do NOT ask the user for their weight, age, diet preferences, or any personal details."
         )
 
     context_parts.extend([
@@ -361,7 +367,8 @@ def medical_research_tool(user_input: str, profile: Optional[Dict] = None) -> st
 
     else:
         context_parts.append(
-            "No profile available. Provide general population-level research and guidelines."
+            "No profile available. Provide general population-level research and guidelines. "
+            "Do NOT ask the user for their medical history or personal details."
         )
 
     context_parts.extend([
