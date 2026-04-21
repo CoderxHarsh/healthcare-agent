@@ -1,5 +1,5 @@
 import re
-from typing import Optional, Dict, List, Tuple
+from .typing import Optional, Dict, List, Tuple
 
 class HealthMetricParser:
     """Parse health metrics from natural language input"""

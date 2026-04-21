@@ -10,7 +10,7 @@ Run from: python test_db.py
 # asyncio - Async runtime for async database operations
 import asyncio
 # Database engine - SQLAlchemy async engine for PostgreSQL
-from database import engine
+from .database import engine
 
 async def test():
     """Test connection to PostgreSQL database"""

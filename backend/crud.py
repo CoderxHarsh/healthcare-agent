@@ -6,19 +6,19 @@ Provides async functions for creating, reading, and updating health data.
 """
 
 # SQLAlchemy async - Async database session management
-from sqlalchemy.ext.asyncio import AsyncSession
+from .sqlalchemy.ext.asyncio import AsyncSession
 # SQLAlchemy select - Building SQL SELECT queries
-from sqlalchemy.future import select
+from .sqlalchemy.future import select
 # SQLAlchemy PostgreSQL - PostgreSQL-specific insert with conflict handling
-from sqlalchemy.dialects.postgresql import insert
+from .sqlalchemy.dialects.postgresql import insert
 # ORM models - Database models for users, health logs, medications
-from models import User, HealthLog, Medication, MedicationLog
+from .models import User, HealthLog, Medication, MedicationLog
 # SQLAlchemy functions - SQL functions like NOW()
-from sqlalchemy.sql import func
+from .sqlalchemy.sql import func
 # datetime - Date and time operations
-from datetime import datetime, timedelta, date
+from .datetime import datetime, timedelta, date
 # typing - Type hints for function parameters and returns
-from typing import List, Dict, Optional
+from .typing import List, Dict, Optional
 
 async def upsert_user(db: AsyncSession, google_sub: str, email: str, name: str, picture: str, refresh_token: str = None) -> User:
     """

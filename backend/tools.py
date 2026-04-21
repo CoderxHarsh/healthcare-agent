@@ -14,7 +14,7 @@ so responses are domain-specific and personalized.
 
 import re
 import math
-from typing import Optional, Dict, Tuple
+from .typing import Optional, Dict, Tuple
 
 
 # ============================================

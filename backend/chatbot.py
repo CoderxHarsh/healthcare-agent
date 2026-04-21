@@ -1,15 +1,15 @@
 # import google.generativeai as genai
-from langchain_groq import ChatGroq
+from .langchain_groq import ChatGroq
 # Source - https://stackoverflow.com/a/68200726
 # Posted by Martin Tovmassian, modified by community. See post 'Timeline' for change history
 # Retrieved 2026-04-04, License - CC BY-SA 4.0
 
 import os                                                                                                                                                                                                          
-from dotenv import load_dotenv, find_dotenv
-from pathlib import Path
-from tools import get_tool_context
+from .dotenv import load_dotenv, find_dotenv
+from .pathlib import Path
+from .tools import get_tool_context
 #for medical info retrieval form medlineplus api
-from medlineplus import get_medical_info
+from .medlineplus import get_medical_info
 
 # Load .env from root directory (works from any location)
 env_path = find_dotenv() or Path(__file__).parent.parent / ".env"
