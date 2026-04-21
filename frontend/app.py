@@ -119,28 +119,37 @@ if "code" in params and not st.session_state.user:
 
                 # Save/update user in backend database
                 st.write("💾 Saving user to backend database...")
-                save_response = requests.post(
-                    f"{API_BASE_URL}/auth/google-login",
-                    json={
-                        "google_sub": userinfo.get("id"),
-                        "email": userinfo.get("email"),
-                        "name": userinfo.get("name"),
-                        "picture": userinfo.get("picture"),
-                        "refresh_token": refresh_token,
-                    },
-                    timeout=10,
-                )
-
-                if save_response.status_code == 200:
-                    user_data = save_response.json()
-                    st.session_state.user = user_data["name"]
-                    st.session_state.user_id = user_data["user_id"]
-                    st.session_state.onboarded = str(user_data["is_onboarded"]).lower()
-                    st.write("✅ Login successful! Redirecting...")
-                    st.query_params.clear()
-                    st.rerun()
-                else:
-                    st.error(f"Failed to save user: {save_response.text}")
+                try:
+                    save_response = requests.post(
+                        f"{API_BASE_URL}/auth/google-login",
+                        json={
+                            "google_sub": userinfo.get("id"),
+                            "email": userinfo.get("email"),
+                            "name": userinfo.get("name"),
+                            "picture": userinfo.get("picture"),
+                            "refresh_token": refresh_token,
+                        },
+                        timeout=10,
+                    )
+                    st.write(f"Backend response status: {save_response.status_code}")
+                    
+                    if save_response.status_code == 200:
+                        user_data = save_response.json()
+                        st.write(f"User data received: {user_data}")
+                        st.session_state.user = user_data["name"]
+                        st.session_state.user_id = user_data["user_id"]
+                        st.session_state.onboarded = str(user_data["is_onboarded"]).lower()
+                        st.write("✅ Login successful! Redirecting...")
+                        st.query_params.clear()
+                        st.rerun()
+                    else:
+                        st.error(f"Failed to save user (status {save_response.status_code}): {save_response.text}")
+                except requests.exceptions.Timeout:
+                    st.error("❌ Backend request timed out. Is the Render backend running?")
+                except requests.exceptions.ConnectionError as ce:
+                    st.error(f"❌ Cannot connect to backend at {API_BASE_URL}: {str(ce)}")
+                except Exception as e:
+                    st.error(f"❌ Backend API error: {str(e)}")
             else:
                 st.error("Failed to get user info from Google")
         else:
