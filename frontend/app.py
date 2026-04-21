@@ -35,12 +35,19 @@ st.set_page_config(
 env_path = find_dotenv() or os.path.join(os.path.dirname(__file__), '..', '.env')
 load_dotenv(env_path)
 
-API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000")
+def get_secret(key, default=None):
+    """Read from Streamlit Cloud secrets first, then fall back to os.getenv for local dev."""
+    try:
+        return st.secrets[key]
+    except (KeyError, FileNotFoundError):
+        return os.getenv(key, default)
+
+API_BASE_URL = get_secret("API_BASE_URL", "http://localhost:8000")
 
 # Google OAuth config
-GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
-GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
-GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI", "http://localhost:8501")
+GOOGLE_CLIENT_ID = get_secret("GOOGLE_CLIENT_ID")
+GOOGLE_CLIENT_SECRET = get_secret("GOOGLE_CLIENT_SECRET")
+GOOGLE_REDIRECT_URI = get_secret("GOOGLE_REDIRECT_URI", "http://localhost:8501")
 GOOGLE_AUTH_ENDPOINT = "https://accounts.google.com/o/oauth2/v2/auth"
 GOOGLE_TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token"
 GOOGLE_USERINFO_ENDPOINT = "https://www.googleapis.com/oauth2/v2/userinfo"
