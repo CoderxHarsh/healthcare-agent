@@ -1,5 +1,5 @@
 # import google.generativeai as genai
-from .langchain_groq import ChatGroq
+from langchain_groq import ChatGroq
 # Source - https://stackoverflow.com/a/68200726
 # Posted by Martin Tovmassian, modified by community. See post 'Timeline' for change history
 # Retrieved 2026-04-04, License - CC BY-SA 4.0

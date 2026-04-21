@@ -13,10 +13,6 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'backend'))
 
 # Streamlit - Web app framework for building data dashboards and UIs
 import streamlit as st
-# Chatbot AI responses - Get personalized health advice using LLM
-from chatbot import get_response
-# Health metric parser - Extract metrics from natural language input
-from data_parser import HealthMetricParser
 # requests - HTTP client for communicating with FastAPI backend
 import requests
 # datetime - Date/time operations for health tracking
@@ -387,16 +383,34 @@ if st.session_state.user:
                 st.session_state.messages.append({"role": "user", "content": user_input})
                 st.chat_message("user").write(user_input)
 
-                # Get response from chatbot WITH profile, health logs, AND chat history
-                response = get_response(
-                    user_input,
-                    user_profile=st.session_state.user_profile,
-                    health_logs=st.session_state.health_logs,
-                    chat_history=st.session_state.messages
-                )
+                # Get response from chatbot via API call
+                try:
+                    response_data = requests.post(
+                        f"{API_BASE_URL}/chat",
+                        json={
+                            "message": user_input,
+                            "user_profile": st.session_state.user_profile,
+                            "health_logs": st.session_state.health_logs,
+                            "chat_history": st.session_state.messages
+                        },
+                        timeout=30
+                    )
+                    response = response_data.json().get("response", "Sorry, I couldn't generate a response.")
+                except Exception as e:
+                    response = f"Error communicating with chatbot: {str(e)}"
                 
                 # Extract and save any health metrics from the input
-                metrics = HealthMetricParser.parse(user_input)
+                try:
+                    metrics_response = requests.post(
+                        f"{API_BASE_URL}/parse-metrics",
+                        json={"text": user_input},
+                        timeout=10
+                    )
+                    metrics = metrics_response.json().get("metrics", [])
+                except Exception as e:
+                    st.warning(f"Could not parse metrics: {str(e)}")
+                    metrics = []
+                    
                 if metrics and st.session_state.user_id:
                     try:
                         for metric in metrics:
@@ -808,6 +822,18 @@ else:
         st.session_state.messages.append({"role": "user", "content": user_input})
         st.chat_message("user").write(user_input)
 
-        response = get_response(user_input, chat_history=st.session_state.messages)
+        try:
+            response_data = requests.post(
+                f"{API_BASE_URL}/chat",
+                json={
+                    "message": user_input,
+                    "chat_history": st.session_state.messages
+                },
+                timeout=30
+            )
+            response = response_data.json().get("response", "Sorry, I couldn't generate a response.")
+        except Exception as e:
+            response = f"Error communicating with chatbot: {str(e)}"
+            
         st.session_state.messages.append({"role": "assistant", "content": response})
         st.chat_message("assistant").write(response)
