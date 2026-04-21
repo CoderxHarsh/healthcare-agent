@@ -6,12 +6,12 @@ health metrics logging, medication tracking, and API endpoints.
 """
 
 # FastAPI core - Web framework for building APIs
-from .fastapi import FastAPI, Request, HTTPException, Depends
+from fastapi import FastAPI, Request, HTTPException, Depends
 # Response types - HTML and redirect responses for web UI
-from .fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 # Pydantic - Data validation and serialization
-from .pydantic import BaseModel
-from .typing import Optional
+from pydantic import BaseModel
+from typing import Optional
 # os - Environment variable and path handling
 import os
 # urllib.parse - URL encoding for OAuth parameters
@@ -21,21 +21,21 @@ import httpx
 # requests - HTTP client for making external API calls
 import requests  # pip install requests
 # python-dotenv - Load .env configuration files
-from .dotenv import load_dotenv, find_dotenv
+from dotenv import load_dotenv, find_dotenv
 # pathlib - Cross-platform file path handling
-from .pathlib import Path
+from pathlib import Path
 # datetime - Date and time operations
-from .datetime import date, datetime
+from datetime import date, datetime
 
 # Database connection, session management, and table initialization
 from .database import engine, Base, get_db, disconnect_db
 # SQLAlchemy async - Async database operations
-from .sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession
 # SQLAlchemy select - Building SQL queries
-from .sqlalchemy.future import select
+from sqlalchemy.future import select
 
 # CRUD operations - User, health logs, medications, and onboarding functions
-from crud import (
+from .crud import (
     upsert_user, create_health_log, get_user_health_logs, 
     get_health_metrics_summary, get_latest_health_log,
     update_user_onboarding, complete_onboarding, get_user_profile,
