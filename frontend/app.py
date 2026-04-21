@@ -803,6 +803,22 @@ if st.session_state.user:
                         st.error(f"Error: {response.json().get('detail', 'Unknown error')}")
                 except Exception as e:
                     st.error(f"❌ Error: {str(e)}")
+        
+        # ========================
+        # FOOTER WITH LEGAL LINKS (LOGGED-IN USERS)
+        # ========================
+        st.divider()
+        footer_col1, footer_col2, footer_col3 = st.columns(3)
+        with footer_col1:
+            if st.button("📋 Terms of Service", use_container_width=True, key="tos_loggedin"):
+                st.switch_page("pages/1_Terms_of_Service")
+        
+        with footer_col2:
+            if st.button("🔒 Privacy Policy", use_container_width=True, key="privacy_loggedin"):
+                st.switch_page("pages/2_Privacy_Policy")
+        
+        with footer_col3:
+            st.caption("© 2026 HealthCare AI")
 
 else:
     # ❌ USER NOT LOGGED IN
@@ -852,3 +868,20 @@ else:
             
         st.session_state.messages.append({"role": "assistant", "content": response})
         st.chat_message("assistant").write(response)
+
+    # ========================
+    # FOOTER WITH LEGAL LINKS
+    # ========================
+    st.divider()
+    
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        if st.button("📋 Terms of Service", use_container_width=True):
+            st.switch_page("pages/1_Terms_of_Service")
+    
+    with col2:
+        if st.button("🔒 Privacy Policy", use_container_width=True):
+            st.switch_page("pages/2_Privacy_Policy")
+    
+    with col3:
+        st.caption("© 2026 HealthCare AI")
