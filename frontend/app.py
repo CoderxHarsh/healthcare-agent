@@ -448,22 +448,7 @@ if st.session_state.user:
 
                     st.session_state.messages.append({"role": "assistant", "content": response})
                     st.chat_message("assistant").write(response)
-                
-                # ========================
-                # FOOTER WITH LEGAL LINKS (CHAT)
-                # ========================
-                st.divider()
-                footer_col1, footer_col2, footer_col3 = st.columns(3)
-                with footer_col1:
-                    if st.button("📋 Terms of Service", use_container_width=True, key="tos_chat"):
-                        st.switch_page("pages/1_Terms_of_Service")
-                
-                with footer_col2:
-                    if st.button("🔒 Privacy Policy", use_container_width=True, key="privacy_chat"):
-                        st.switch_page("pages/2_Privacy_Policy")
-                
-                with footer_col3:
-                    st.caption("© 2026 HealthCare AI")
+
 
         elif page == "📊 Wellness Tracker":
             st.header("📊 Your Wellness Tracker")
@@ -621,22 +606,6 @@ if st.session_state.user:
                         
                 except Exception as e:
                     st.error(f"❌ Error: {str(e)}")
-            
-            # ========================
-            # FOOTER WITH LEGAL LINKS (WELLNESS TRACKER)
-            # ========================
-            st.divider()
-            wt_col1, wt_col2, wt_col3 = st.columns(3)
-            with wt_col1:
-                if st.button("📋 Terms of Service", use_container_width=True, key="tos_wellness"):
-                    st.switch_page("pages/1_Terms_of_Service")
-            
-            with wt_col2:
-                if st.button("🔒 Privacy Policy", use_container_width=True, key="privacy_wellness"):
-                    st.switch_page("pages/2_Privacy_Policy")
-            
-            with wt_col3:
-                st.caption("© 2026 HealthCare AI")
 
         elif page == "💊 Medications":
             st.header("💊 Medication Manager")
@@ -836,22 +805,6 @@ if st.session_state.user:
                         st.error(f"Error: {response.json().get('detail', 'Unknown error')}")
                 except Exception as e:
                     st.error(f"❌ Error: {str(e)}")
-            
-            # ========================
-            # FOOTER WITH LEGAL LINKS (MEDICATIONS)
-            # ========================
-            st.divider()
-            med_footer_col1, med_footer_col2, med_footer_col3 = st.columns(3)
-            with med_footer_col1:
-                if st.button("📋 Terms of Service", use_container_width=True, key="tos_medications"):
-                    st.switch_page("pages/1_Terms_of_Service")
-            
-            with med_footer_col2:
-                if st.button("🔒 Privacy Policy", use_container_width=True, key="privacy_medications"):
-                    st.switch_page("pages/2_Privacy_Policy")
-            
-            with med_footer_col3:
-                st.caption("© 2026 HealthCare AI")
 
 else:
     # ❌ USER NOT LOGGED IN
@@ -902,20 +855,3 @@ else:
                 
             st.session_state.messages.append({"role": "assistant", "content": response})
             st.chat_message("assistant").write(response)
-        
-        # ========================
-        # FOOTER WITH LEGAL LINKS
-        # ========================
-        st.divider()
-        
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            if st.button("📋 Terms of Service", use_container_width=True):
-                st.switch_page("pages/1_Terms_of_Service")
-        
-        with col2:
-            if st.button("🔒 Privacy Policy", use_container_width=True):
-                st.switch_page("pages/2_Privacy_Policy")
-        
-        with col3:
-            st.caption("© 2026 HealthCare AI")
