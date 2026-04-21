@@ -52,6 +52,8 @@ from .data_parser import HealthMetricParser
 from .google_calendar import create_medication_reminder, delete_medication_reminder
 # PDF Generation - Create health report PDFs
 from .pdf_generator import generate_health_report_pdf, format_report_data
+# Chatbot - Get LLM responses
+from .chatbot import get_response
 
 app = FastAPI()
 
@@ -67,6 +69,19 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ============================================
+# PYDANTIC REQUEST MODELS
+# ============================================
+
+class ChatRequest(BaseModel):
+    message: str
+    user_profile: Optional[dict] = None
+    health_logs: Optional[list] = None
+    chat_history: Optional[list] = None
+
+class MetricsParseRequest(BaseModel):
+    text: str
 
 # ============================================
 # STARTUP & SHUTDOWN OPERATIONS
@@ -873,3 +888,38 @@ async def export_health_report(
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=400, detail=f"Failed to generate report: {str(e)}")
+
+
+# ============================================
+# CHATBOT ENDPOINTS
+# ============================================
+
+@app.post("/chat")
+async def chat_endpoint(request: ChatRequest):
+    """Get chatbot response with optional user profile and health logs context"""
+    try:
+        response = get_response(
+            request.message,
+            user_profile=request.user_profile,
+            health_logs=request.health_logs,
+            chat_history=request.chat_history
+        )
+        return {
+            "status": "success",
+            "response": response
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/parse-metrics")
+async def parse_metrics_endpoint(request: MetricsParseRequest):
+    """Parse health metrics from natural language text"""
+    try:
+        metrics = HealthMetricParser.parse(request.text)
+        return {
+            "status": "success",
+            "metrics": metrics or []
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
