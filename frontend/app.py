@@ -389,64 +389,81 @@ if st.session_state.user:
                     except Exception:
                         st.session_state.health_logs = []
 
-            for msg in st.session_state.messages:
-                st.chat_message(msg["role"]).write(msg["content"])
+            with st.container(border=True):
+                for msg in st.session_state.messages:
+                    st.chat_message(msg["role"]).write(msg["content"])
 
-            user_input = st.chat_input("Ask me about your health...")
+                user_input = st.chat_input("Ask me about your health...")
 
-            if user_input:
-                st.session_state.messages.append({"role": "user", "content": user_input})
-                st.chat_message("user").write(user_input)
+                if user_input:
+                    st.session_state.messages.append({"role": "user", "content": user_input})
+                    st.chat_message("user").write(user_input)
 
-                # Get response from chatbot via API call
-                try:
-                    response_data = requests.post(
-                        f"{API_BASE_URL}/chat",
-                        json={
-                            "message": user_input,
-                            "user_profile": st.session_state.user_profile,
-                            "health_logs": st.session_state.health_logs,
-                            "chat_history": st.session_state.messages
-                        },
-                        timeout=30
-                    )
-                    response = response_data.json().get("response", "Sorry, I couldn't generate a response.")
-                except Exception as e:
-                    response = f"Error communicating with chatbot: {str(e)}"
-                
-                # Extract and save any health metrics from the input
-                try:
-                    metrics_response = requests.post(
-                        f"{API_BASE_URL}/parse-metrics",
-                        json={"text": user_input},
-                        timeout=10
-                    )
-                    metrics = metrics_response.json().get("metrics", [])
-                except Exception as e:
-                    st.warning(f"Could not parse metrics: {str(e)}")
-                    metrics = []
-                    
-                if metrics and st.session_state.user_id:
+                    # Get response from chatbot via API call
                     try:
-                        for metric in metrics:
-                            requests.post(
-                                f"{API_BASE_URL}/health-logs/{st.session_state.user_id}",
-                                json={
-                                    "metric_type": metric["metric_type"],
-                                    "value": metric["value"],
-                                    "unit": metric["unit"],
-                                    "source": "chatbot"
-                                },
-                                timeout=5
-                            )
-                        response += f"\n\n📊 **Metrics saved:** {', '.join([m['metric_type'] for m in metrics])}"
-                        # Refresh the cached health logs so next response has latest data
-                        st.session_state.health_logs = None
+                        response_data = requests.post(
+                            f"{API_BASE_URL}/chat",
+                            json={
+                                "message": user_input,
+                                "user_profile": st.session_state.user_profile,
+                                "health_logs": st.session_state.health_logs,
+                                "chat_history": st.session_state.messages
+                            },
+                            timeout=30
+                        )
+                        response = response_data.json().get("response", "Sorry, I couldn't generate a response.")
                     except Exception as e:
-                        st.warning(f"⚠️ Could not save metrics: {str(e)}")
+                        response = f"Error communicating with chatbot: {str(e)}"
+                    
+                    # Extract and save any health metrics from the input
+                    try:
+                        metrics_response = requests.post(
+                            f"{API_BASE_URL}/parse-metrics",
+                            json={"text": user_input},
+                            timeout=10
+                        )
+                        metrics = metrics_response.json().get("metrics", [])
+                    except Exception as e:
+                        st.warning(f"Could not parse metrics: {str(e)}")
+                        metrics = []
+                        
+                    if metrics and st.session_state.user_id:
+                        try:
+                            for metric in metrics:
+                                requests.post(
+                                    f"{API_BASE_URL}/health-logs/{st.session_state.user_id}",
+                                    json={
+                                        "metric_type": metric["metric_type"],
+                                        "value": metric["value"],
+                                        "unit": metric["unit"],
+                                        "source": "chatbot"
+                                    },
+                                    timeout=5
+                                )
+                            response += f"\n\n📊 **Metrics saved:** {', '.join([m['metric_type'] for m in metrics])}"
+                            # Refresh the cached health logs so next response has latest data
+                            st.session_state.health_logs = None
+                        except Exception as e:
+                            st.warning(f"⚠️ Could not save metrics: {str(e)}")
 
-                st.session_state.messages.append({"role": "assistant", "content": response})
-                st.chat_message("assistant").write(response)
+                    st.session_state.messages.append({"role": "assistant", "content": response})
+                    st.chat_message("assistant").write(response)
+                
+                # ========================
+                # FOOTER WITH LEGAL LINKS (CHAT)
+                # ========================
+                st.divider()
+                footer_col1, footer_col2, footer_col3 = st.columns(3)
+                with footer_col1:
+                    if st.button("📋 Terms of Service", use_container_width=True, key="tos_chat"):
+                        st.switch_page("pages/1_Terms_of_Service")
+                
+                with footer_col2:
+                    if st.button("🔒 Privacy Policy", use_container_width=True, key="privacy_chat"):
+                        st.switch_page("pages/2_Privacy_Policy")
+                
+                with footer_col3:
+                    st.caption("© 2026 HealthCare AI")
 
         elif page == "📊 Wellness Tracker":
             st.header("📊 Your Wellness Tracker")
@@ -604,6 +621,22 @@ if st.session_state.user:
                         
                 except Exception as e:
                     st.error(f"❌ Error: {str(e)}")
+            
+            # ========================
+            # FOOTER WITH LEGAL LINKS (WELLNESS TRACKER)
+            # ========================
+            st.divider()
+            wt_col1, wt_col2, wt_col3 = st.columns(3)
+            with wt_col1:
+                if st.button("📋 Terms of Service", use_container_width=True, key="tos_wellness"):
+                    st.switch_page("pages/1_Terms_of_Service")
+            
+            with wt_col2:
+                if st.button("🔒 Privacy Policy", use_container_width=True, key="privacy_wellness"):
+                    st.switch_page("pages/2_Privacy_Policy")
+            
+            with wt_col3:
+                st.caption("© 2026 HealthCare AI")
 
         elif page == "💊 Medications":
             st.header("💊 Medication Manager")
@@ -803,22 +836,22 @@ if st.session_state.user:
                         st.error(f"Error: {response.json().get('detail', 'Unknown error')}")
                 except Exception as e:
                     st.error(f"❌ Error: {str(e)}")
-        
-        # ========================
-        # FOOTER WITH LEGAL LINKS (LOGGED-IN USERS)
-        # ========================
-        st.divider()
-        footer_col1, footer_col2, footer_col3 = st.columns(3)
-        with footer_col1:
-            if st.button("📋 Terms of Service", use_container_width=True, key="tos_loggedin"):
-                st.switch_page("pages/1_Terms_of_Service")
-        
-        with footer_col2:
-            if st.button("🔒 Privacy Policy", use_container_width=True, key="privacy_loggedin"):
-                st.switch_page("pages/2_Privacy_Policy")
-        
-        with footer_col3:
-            st.caption("© 2026 HealthCare AI")
+            
+            # ========================
+            # FOOTER WITH LEGAL LINKS (MEDICATIONS)
+            # ========================
+            st.divider()
+            med_footer_col1, med_footer_col2, med_footer_col3 = st.columns(3)
+            with med_footer_col1:
+                if st.button("📋 Terms of Service", use_container_width=True, key="tos_medications"):
+                    st.switch_page("pages/1_Terms_of_Service")
+            
+            with med_footer_col2:
+                if st.button("🔒 Privacy Policy", use_container_width=True, key="privacy_medications"):
+                    st.switch_page("pages/2_Privacy_Policy")
+            
+            with med_footer_col3:
+                st.caption("© 2026 HealthCare AI")
 
 else:
     # ❌ USER NOT LOGGED IN
@@ -844,44 +877,45 @@ else:
     st.divider()
     st.subheader("💬 Chat with Health Assistant")
     
-    for msg in st.session_state.messages:
-        st.chat_message(msg["role"]).write(msg["content"])
+    with st.container(border=True):
+        for msg in st.session_state.messages:
+            st.chat_message(msg["role"]).write(msg["content"])
 
-    user_input = st.chat_input("Ask me about your health...")
+        user_input = st.chat_input("Ask me about your health...")
 
-    if user_input:
-        st.session_state.messages.append({"role": "user", "content": user_input})
-        st.chat_message("user").write(user_input)
+        if user_input:
+            st.session_state.messages.append({"role": "user", "content": user_input})
+            st.chat_message("user").write(user_input)
 
-        try:
-            response_data = requests.post(
-                f"{API_BASE_URL}/chat",
-                json={
-                    "message": user_input,
-                    "chat_history": st.session_state.messages
-                },
-                timeout=30
-            )
-            response = response_data.json().get("response", "Sorry, I couldn't generate a response.")
-        except Exception as e:
-            response = f"Error communicating with chatbot: {str(e)}"
-            
-        st.session_state.messages.append({"role": "assistant", "content": response})
-        st.chat_message("assistant").write(response)
-
-    # ========================
-    # FOOTER WITH LEGAL LINKS
-    # ========================
-    st.divider()
-    
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        if st.button("📋 Terms of Service", use_container_width=True):
-            st.switch_page("pages/1_Terms_of_Service")
-    
-    with col2:
-        if st.button("🔒 Privacy Policy", use_container_width=True):
-            st.switch_page("pages/2_Privacy_Policy")
-    
-    with col3:
-        st.caption("© 2026 HealthCare AI")
+            try:
+                response_data = requests.post(
+                    f"{API_BASE_URL}/chat",
+                    json={
+                        "message": user_input,
+                        "chat_history": st.session_state.messages
+                    },
+                    timeout=30
+                )
+                response = response_data.json().get("response", "Sorry, I couldn't generate a response.")
+            except Exception as e:
+                response = f"Error communicating with chatbot: {str(e)}"
+                
+            st.session_state.messages.append({"role": "assistant", "content": response})
+            st.chat_message("assistant").write(response)
+        
+        # ========================
+        # FOOTER WITH LEGAL LINKS
+        # ========================
+        st.divider()
+        
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            if st.button("📋 Terms of Service", use_container_width=True):
+                st.switch_page("pages/1_Terms_of_Service")
+        
+        with col2:
+            if st.button("🔒 Privacy Policy", use_container_width=True):
+                st.switch_page("pages/2_Privacy_Policy")
+        
+        with col3:
+            st.caption("© 2026 HealthCare AI")
