@@ -6,13 +6,13 @@ and ORM base configuration using SQLAlchemy 2.0.
 """
 
 # SQLAlchemy async - Async database engine and session factory
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+from .sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 # SQLAlchemy ORM - Session management and base model
-from sqlalchemy.orm import sessionmaker, DeclarativeBase
+from .sqlalchemy.orm import sessionmaker, DeclarativeBase
 # os - Environment variable access for database URL
 import os
 # python-dotenv - Load .env configuration file
-from dotenv import load_dotenv
+from .dotenv import load_dotenv
 
 load_dotenv()
 

@@ -6,12 +6,12 @@ health metrics logging, medication tracking, and API endpoints.
 """
 
 # FastAPI core - Web framework for building APIs
-from fastapi import FastAPI, Request, HTTPException, Depends
+from .fastapi import FastAPI, Request, HTTPException, Depends
 # Response types - HTML and redirect responses for web UI
-from fastapi.responses import HTMLResponse, RedirectResponse
+from .fastapi.responses import HTMLResponse, RedirectResponse
 # Pydantic - Data validation and serialization
-from pydantic import BaseModel
-from typing import Optional
+from .pydantic import BaseModel
+from .typing import Optional
 # os - Environment variable and path handling
 import os
 # urllib.parse - URL encoding for OAuth parameters
@@ -21,18 +21,18 @@ import httpx
 # requests - HTTP client for making external API calls
 import requests  # pip install requests
 # python-dotenv - Load .env configuration files
-from dotenv import load_dotenv, find_dotenv
+from .dotenv import load_dotenv, find_dotenv
 # pathlib - Cross-platform file path handling
-from pathlib import Path
+from .pathlib import Path
 # datetime - Date and time operations
-from datetime import date, datetime
+from .datetime import date, datetime
 
 # Database connection, session management, and table initialization
-from database import engine, Base, get_db, disconnect_db
+from .database import engine, Base, get_db, disconnect_db
 # SQLAlchemy async - Async database operations
-from sqlalchemy.ext.asyncio import AsyncSession
+from .sqlalchemy.ext.asyncio import AsyncSession
 # SQLAlchemy select - Building SQL queries
-from sqlalchemy.future import select
+from .sqlalchemy.future import select
 
 # CRUD operations - User, health logs, medications, and onboarding functions
 from crud import (
@@ -45,18 +45,18 @@ from crud import (
 )
 
 # SQLAlchemy models - User database model
-from models import User
+from .models import User
 # Health metric parser - Extract health metrics from natural language
-from data_parser import HealthMetricParser
+from .data_parser import HealthMetricParser
 # Google Calendar integration - Create/delete medication reminders
-from google_calendar import create_medication_reminder, delete_medication_reminder
+from .google_calendar import create_medication_reminder, delete_medication_reminder
 # PDF Generation - Create health report PDFs
-from pdf_generator import generate_health_report_pdf, format_report_data
+from .pdf_generator import generate_health_report_pdf, format_report_data
 
 app = FastAPI()
 
 # CORS middleware — allow Streamlit Cloud (and localhost) to call this API
-from fastapi.middleware.cors import CORSMiddleware
+from .fastapi.middleware.cors import CORSMiddleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[

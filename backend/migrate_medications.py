@@ -7,7 +7,7 @@ Usage: python migrate_medications.py
 import asyncio
 import asyncpg
 import os
-from dotenv import load_dotenv
+from .dotenv import load_dotenv
 
 load_dotenv()
 

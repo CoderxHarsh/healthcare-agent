@@ -10,7 +10,7 @@ import asyncio
 # requests - HTTP client (imported but may be unused)
 import requests
 # Database engine and models - For table creation
-from database import engine, Base
+from .database import engine, Base
 
 async def init_tables():
     """Create all SQLAlchemy ORM model tables in PostgreSQL"""

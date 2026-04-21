@@ -14,7 +14,7 @@ import asyncpg
 # os - Environment variable access
 import os
 # python-dotenv - Load .env configuration
-from dotenv import load_dotenv
+from .dotenv import load_dotenv
 
 async def migrate():
     """Add missing health profile columns to the users table"""

@@ -8,11 +8,11 @@ Displays user profiles, health metrics, and onboarding completion status.
 # asyncio - Async runtime for running async database queries
 import asyncio
 # AsyncSessionLocal - Get database session for queries
-from database import AsyncSessionLocal
+from .database import AsyncSessionLocal
 # User model - ORM model for users table
-from models import User
+from .models import User
 # SQLAlchemy select - Building SQL queries
-from sqlalchemy.future import select
+from ..future import select
 
 async def check_user_data():
     """Query and display all user onboarding profiles from the database"""
