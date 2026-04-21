@@ -160,6 +160,8 @@ if "code" in params and not st.session_state.user:
                         st.session_state.onboarded = str(user_data["is_onboarded"]).lower()
                         st.write("✅ Login successful! Redirecting...")
                         st.query_params.clear()
+                        import time
+                        time.sleep(0.5)
                         st.rerun()
                     else:
                         st.error(f"Failed to save user (status {save_response.status_code}): {save_response.text}")
@@ -315,6 +317,8 @@ def show_onboarding_page():
                             st.query_params.clear()
                             st.success("✅ Onboarding completed successfully!")
                             st.balloons()
+                            import time
+                            time.sleep(0.5)
                             st.rerun()
                         else:
                             st.error(f"❌ Error completing onboarding: {response2.json()}")
@@ -359,6 +363,8 @@ if st.session_state.user:
                 st.session_state.health_logs = None
                 st.session_state.messages = []
                 st.query_params.clear()
+                import time
+                time.sleep(0.5)
                 st.rerun()
 
         # ✅ NAVIGATION FOR LOGGED-IN USERS
