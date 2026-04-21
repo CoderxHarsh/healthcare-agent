@@ -6,11 +6,11 @@ No external dependencies like GTK required.
 """
 
 import os
-from .fpdf import FPDF
-from .fpdf.enums import XPos, YPos
-from .io import BytesIO
-from .datetime import datetime
-from .typing import Dict, List, Any
+from fpdf import FPDF
+from fpdf.enums import XPos, YPos
+from io import BytesIO
+from datetime import datetime
+from typing import Dict, List, Any
 
 
 class HealthReportPDF(FPDF):
