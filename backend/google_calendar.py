@@ -9,10 +9,10 @@ No extra dependencies needed — uses httpx (already installed with FastAPI).
 import httpx
 import os
 import json
-from .datetime import datetime, timedelta, date
-from .typing import Optional, Dict
-from .dotenv import load_dotenv, find_dotenv
-from .pathlib import Path
+from datetime import datetime, timedelta, date
+from typing import Optional, Dict
+from dotenv import load_dotenv, find_dotenv
+from pathlib import Path
 
 # Load .env from root directory (works from any location)
 env_path = find_dotenv() or Path(__file__).parent.parent / ".env"

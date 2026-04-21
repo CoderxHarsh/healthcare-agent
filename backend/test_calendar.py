@@ -15,11 +15,11 @@ import asyncpg
 # os - Environment variable access
 import os
 # python-dotenv - Load .env configuration
-from .dotenv import load_dotenv
+from dotenv import load_dotenv
 load_dotenv()
 
 from .google_calendar import refresh_access_token, create_medication_reminder
-from .datetime import date
+from datetime import date
 
 url = os.getenv("DATABASE_URL").replace("postgresql+asyncpg://", "postgresql://")
 

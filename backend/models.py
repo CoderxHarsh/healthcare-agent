@@ -5,7 +5,7 @@ SQLAlchemy ORM models for users, health logs, medications, and adherence trackin
 """
 
 # SQLAlchemy column types - Define database columns for ORM models
-from .sqlalchemy import Column, Integer, String, Boolean, DateTime, func, Text, Float, ForeignKey, Date, Time
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, func, Text, Float, ForeignKey, Date, Time
 # Database base class - Provides ORM foundation for all models
 from .database import Base
 

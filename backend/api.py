@@ -56,7 +56,7 @@ from .pdf_generator import generate_health_report_pdf, format_report_data
 app = FastAPI()
 
 # CORS middleware — allow Streamlit Cloud (and localhost) to call this API
-from .fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.cors import CORSMiddleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
