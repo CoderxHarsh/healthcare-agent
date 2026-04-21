@@ -88,9 +88,14 @@ if "health_logs" not in st.session_state:
 # -------------------------
 params = st.query_params
 
+# DEBUG: Show query params
+if params:
+    st.write(f"🔍 DEBUG: Query params detected: {list(params.keys())}")
+
 # Handle Google OAuth callback — exchange code for token
 if "code" in params and not st.session_state.user:
     code = params["code"]
+    st.write(f"🔍 DEBUG: OAuth code found, starting callback handler...")
     st.info("🔄 Processing OAuth callback... (1/3)")
     try:
         # Exchange authorization code for access token
@@ -102,8 +107,14 @@ if "code" in params and not st.session_state.user:
             "grant_type": "authorization_code",
         }
         st.write("📝 Exchanging authorization code for tokens...")
+        st.write(f"🔍 DEBUG: Token endpoint: {GOOGLE_TOKEN_ENDPOINT}")
+        st.write(f"🔍 DEBUG: Redirect URI: {GOOGLE_REDIRECT_URI}")
         token_response = requests.post(GOOGLE_TOKEN_ENDPOINT, data=token_data, timeout=30)
 
+        st.write(f"🔍 DEBUG: Google token response status: {token_response.status_code}")
+        if token_response.status_code != 200:
+            st.error(f"Google token response error: {token_response.text}")
+            
         if token_response.status_code == 200:
             tokens = token_response.json()
             access_token = tokens.get("access_token")
@@ -112,23 +123,31 @@ if "code" in params and not st.session_state.user:
             # Get user info from Google
             headers = {"Authorization": f"Bearer {access_token}"}
             st.write("👤 Retrieving Google user info...")
+            st.write(f"🔍 DEBUG: Userinfo endpoint: {GOOGLE_USERINFO_ENDPOINT}")
             userinfo_response = requests.get(GOOGLE_USERINFO_ENDPOINT, headers=headers, timeout=30)
 
+            st.write(f"🔍 DEBUG: Google userinfo response status: {userinfo_response.status_code}")
+            if userinfo_response.status_code != 200:
+                st.error(f"Google userinfo response error: {userinfo_response.text}")
+                
             if userinfo_response.status_code == 200:
                 userinfo = userinfo_response.json()
 
                 # Save/update user in backend database
                 st.write("💾 Saving user to backend database...")
+                user_payload = {
+                    "google_sub": userinfo.get("id"),
+                    "email": userinfo.get("email"),
+                    "name": userinfo.get("name"),
+                    "picture": userinfo.get("picture"),
+                    "refresh_token": refresh_token,
+                }
+                st.write(f"🔍 DEBUG: Sending to backend: {user_payload}")
+                st.write(f"🔍 DEBUG: Backend URL: {API_BASE_URL}/auth/google-login")
                 try:
                     save_response = requests.post(
                         f"{API_BASE_URL}/auth/google-login",
-                        json={
-                            "google_sub": userinfo.get("id"),
-                            "email": userinfo.get("email"),
-                            "name": userinfo.get("name"),
-                            "picture": userinfo.get("picture"),
-                            "refresh_token": refresh_token,
-                        },
+                        json=user_payload,
                         timeout=10,
                     )
                     st.write(f"Backend response status: {save_response.status_code}")
