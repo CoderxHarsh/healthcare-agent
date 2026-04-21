@@ -103,7 +103,3 @@ st.markdown("""
     <p>© 2026 HealthCare AI. All rights reserved.</p>
 </div>
 """, unsafe_allow_html=True)
-
-# Back to home button
-if st.button("← Back to Home", use_container_width=True):
-    st.switch_page("app")
