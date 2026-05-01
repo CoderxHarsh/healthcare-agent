@@ -700,24 +700,39 @@ if st.session_state.user:
                 ''', unsafe_allow_html=True)
                 
             with c_ai:
-                with st.spinner("Analyzing..."):
-                    ai_text = "Analysis unavailable."
-                    try:
-                        res = requests.get(f"{API_BASE_URL}/user/{st.session_state.user_id}/vitals-summary", timeout=10)
+                ai_text = "Gathering health insights..."
+                error_occurred = False
+                
+                try:
+                    with st.spinner("🔍 Analyzing your health data..."):
+                        res = requests.get(f"{API_BASE_URL}/user/{st.session_state.user_id}/vitals-summary", timeout=15)
                         if res.status_code == 200:
-                            ai_text = res.json().get("summary", "")
-                    except:
-                        pass
+                            response_data = res.json()
+                            ai_text = response_data.get("summary", "Analysis unavailable.")
+                        else:
+                            ai_text = "Could not retrieve analysis. Please check your health data."
+                            error_occurred = True
+                except requests.exceptions.Timeout:
+                    ai_text = "Analysis is loading... (timeout). Try refreshing the page."
+                    error_occurred = True
+                except Exception as e:
+                    ai_text = "Unable to generate analysis. Please make sure you've logged some health data."
+                    error_occurred = False
                         
+                # Display the AI analysis with styling
+                badge_color = "rgba(239, 68, 68, 0.2)" if error_occurred else "rgba(34, 197, 94, 0.2)"
+                badge_text = "⚠️ CHECK NEEDED" if error_occurred else "✅ GENERATED"
+                badge_border = "rgba(239, 68, 68, 0.5)" if error_occurred else "rgba(34, 197, 94, 0.5)"
+                
                 st.markdown(f'''
                 <div class="dashboard-card" style="height: 100%;">
-                    <div class="metric-title" style="margin-bottom:15px;">AI ANALYSIS</div>
-                    <p style="color:#CBD5E1; font-size:0.95rem; line-height:1.5;">
+                    <div class="metric-title" style="margin-bottom:15px;">🤖 AI ANALYSIS</div>
+                    <p style="color:#CBD5E1; font-size:0.95rem; line-height:1.6;">
                         {ai_text}
                     </p>
                     <div style="margin-top:20px;">
-                        <span class="badge-warning" style="margin-right:10px;">2 ALERTS</span>
-                        <span class="badge-success" style="background:rgba(59,130,246,0.2); color:#3B82F6; border-color:rgba(59,130,246,0.5);">REVIEWED</span>
+                        <span class="badge-warning" style="margin-right:10px; background:{badge_color}; border-color:{badge_border};">{badge_text}</span>
+                        <span class="badge-success" style="background:rgba(59,130,246,0.2); color:#3B82F6; border-color:rgba(59,130,246,0.5);">ML POWERED</span>
                     </div>
                 </div>
                 ''', unsafe_allow_html=True)

@@ -62,6 +62,8 @@ from .google_calendar import create_medication_reminder, delete_medication_remin
 from .pdf_generator import generate_health_report_pdf, format_report_data
 # Chatbot - Get LLM responses
 from .chatbot import get_response
+# Health Analyzer - ML-based health analysis and predictions
+from .health_analyzer import get_health_analysis
 
 app = FastAPI()
 
@@ -1022,20 +1024,59 @@ async def export_health_report(
 
 @app.get("/user/{user_id}/vitals-summary")
 async def get_vitals_summary(user_id: int, db: AsyncSession = Depends(get_db)):
-    """Generate a quick AI summary of the user's recent vitals for the dashboard."""
-    logs_data = await get_user_health_logs(db, user_id, days=14)
-    health_logs = [
-        {
-            "metric_type": log.metric_type,
-            "value": log.value,
-            "unit": log.unit,
-            "created_at": log.created_at.isoformat(),
+    """Generate a personalized AI analysis of the user's health using ML model."""
+    try:
+        # Get user profile
+        profile = await get_user_profile(db, user_id)
+        if not profile:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        # Get recent health logs
+        logs_data = await get_user_health_logs(db, user_id, days=30)
+        health_logs = [
+            {
+                "metric_type": log.metric_type,
+                "value": log.value,
+                "unit": log.unit,
+                "created_at": log.created_at.isoformat(),
+                "notes": log.notes or ""
+            }
+            for log in logs_data
+        ]
+        
+        # Convert profile to dictionary
+        profile_dict = {
+            "id": profile.id,
+            "name": profile.name,
+            "email": profile.email,
+            "age": profile.age,
+            "gender": profile.gender,
+            "height_cm": profile.height_cm,
+            "weight_kg": profile.weight_kg,
+            "health_conditions": profile.health_conditions,
+            "medications": profile.medications,
+            "allergies": profile.allergies,
+            "fitness_level": profile.fitness_level,
+            "health_goals": profile.health_goals,
         }
-        for log in logs_data
-    ]
-    from .chatbot import generate_vitals_summary
-    summary = generate_vitals_summary(health_logs)
-    return {"status": "success", "summary": summary}
+        
+        # Generate AI analysis
+        analysis = get_health_analysis(profile_dict, health_logs)
+        
+        return {
+            "status": "success",
+            "summary": analysis,
+            "generated_at": datetime.now().isoformat()
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error generating vitals summary: {str(e)}")
+        return {
+            "status": "error",
+            "summary": "Unable to generate analysis at this moment. Please try again later.",
+            "error": str(e)
+        }
 
 @app.post("/chat")
 async def chat_endpoint(request: ChatRequest):
@@ -1193,4 +1234,4 @@ async def upload_user_document(user_id: int, file: UploadFile = File(...)):
             "message": f"✅ '{file.filename}' ingested with {chunks_indexed} chunks for user {user_id}."
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ingestion failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Ingestion failed: {str(e)}")
