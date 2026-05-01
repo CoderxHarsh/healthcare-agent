@@ -4,6 +4,8 @@ requests
 python-dotenv  #for loading environment variables from .env file
 langchain==1.0.5 
 langchain-groq==1.0.0
+langchain-google-genai  # Google embeddings for RAG
+langchain-community     # LangChain community integrations
 python-jose[cryptography] # for JWT handling in GAuth with python version 3.11
 # fastapi 
 fastapi[all]
@@ -16,3 +18,11 @@ psycopg2-binary  # for PostgreSQL support
 
 pandas # for data manipulation and analysis
 fpdf2 # for PDF generation (Windows-compatible)
+
+# RAG pipeline
+chromadb         # local vector store (persisted)
+pypdf            # PDF text extraction
+
+# Web Scraping (Standalone Scripts)
+trafilatura      # main article extractor
+beautifulsoup4   # fallback HTML parser

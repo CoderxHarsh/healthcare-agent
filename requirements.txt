@@ -1,20 +1,37 @@
-google-generativeai 
-streamlit
-requests
-python-dotenv  #for loading environment variables from .env file
-langchain==1.0.5 
-langchain-groq==1.0.0
-python-jose[cryptography] # for JWT handling in GAuth with python version 3.11
-# fastapi 
-fastapi[all]
-uvicorn #installed with fastapi
+# ==========================================
+# 🌐 WEB FRAMEWORK & FRONTEND
+# ==========================================
+fastapi[all]          # High-performance backend API framework
+uvicorn               # ASGI server to run the FastAPI application
+streamlit             # Interactive web framework for the chat UI and dashboard
 
-#for database
-sqlalchemy #for ORM support
-asyncpg # for async PostgreSQL support
-psycopg2-binary  # for PostgreSQL support
+# ==========================================
+# 🧠 AI, LLM & RAG PIPELINE
+# ==========================================
+langchain             # Core framework for chaining LLM calls and routing tools
+langchain-groq        # Groq integration for fast LLM inference
+google-genai          # Google's new SDK for Gemini embeddings (used in RAG)
+google-generativeai   # Google's legacy SDK (kept for backwards compatibility)
+chromadb              # Local vector database to store document embeddings for RAG
 
-pandas # for data manipulation and analysis
-weasyprint # for HTML to PDF conversion
-jinja2 # for HTML templating
-fpdf2 # for PDF generation (Windows-compatible)
+# ==========================================
+# 🗄️ DATABASE (PostgreSQL)
+# ==========================================
+sqlalchemy            # Object-Relational Mapper (ORM) for defining database tables
+asyncpg               # Asynchronous PostgreSQL driver for high-performance queries
+psycopg2-binary       # Synchronous PostgreSQL driver (often required by SQLAlchemy)
+pgvector              # Vector similarity search for PostgreSQL
+
+# ==========================================
+# 🔐 AUTHENTICATION & SECURITY
+# ==========================================
+python-jose[cryptography] # Handles JWT token creation and validation for OAuth
+
+# ==========================================
+# 🛠️ UTILITIES & DATA PROCESSING
+# ==========================================
+python-dotenv         # Loads secrets and configurations from the .env file
+requests              # Makes HTTP calls to external APIs (Google, MedlinePlus)
+pandas                # Data manipulation for the wellness tracker and health logs
+fpdf2                 # Generates the downloadable PDF health reports (Windows compatible)
+pypdf                 # Extracts text from uploaded PDFs so they can be ingested by RAG

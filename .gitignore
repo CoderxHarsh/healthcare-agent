@@ -11,3 +11,6 @@ google_credentials*.json
 stages.md
 
 onboarding_guide.md
+/_trash_bin
+fix_emojis.py
+populate_test_data.py

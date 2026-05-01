@@ -1,2 +1,0 @@
-"""Module to handle data ingestion for the training of the HealthCareAgent. This includes functions to read and process user onboarding data, health logs, and medication information from the database.
- The ingested data will be used to create training datasets for the agent's machine learning models."""

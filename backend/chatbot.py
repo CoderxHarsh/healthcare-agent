@@ -8,8 +8,10 @@ import os
 from dotenv import load_dotenv, find_dotenv
 from pathlib import Path
 from .tools import get_tool_context
-#for medical info retrieval form medlineplus api
+#for medical info retrieval from medlineplus api
 from .medlineplus import get_medical_info
+# RAG pipeline — retrieve grounded knowledge from the vector store
+from .rag.retriever import retrieve, format_rag_context
 
 # Load .env from root directory (works from any location)
 env_path = find_dotenv() or Path(__file__).parent.parent / ".env"
@@ -162,6 +164,12 @@ def get_response(user_input, user_profile=None, health_logs=None, chat_history=N
 
     # (Conversation history generation moved to the top)
 
+    # --- RAG RETRIEVAL ---
+    # Fetch the most relevant chunks from the local knowledge base (PostgreSQL)
+    user_id = user_profile.get("id") if user_profile else None
+    rag_chunks = retrieve(user_input, user_id=user_id)
+    rag_context = format_rag_context(rag_chunks)
+
     # --- TOOL ROUTING (history-aware) ---
     # Detect the topic from the current message AND recent history
     tool_context, tool_name = get_tool_context(user_input, user_profile, chat_history)
@@ -188,10 +196,11 @@ def get_response(user_input, user_profile=None, health_logs=None, chat_history=N
     {profile_context}
     {logs_context}
     {history_context}
+    {rag_context}
     {tool_context}
 
     GENERAL GUIDELINES:
-    - ONLY answer based on the provided context.
+    - Prioritize information from the KNOWLEDGE BASE section above when answering.
     - If unsure, say "consult a doctor".
     - Never guess medications or dosages.
     - Answer clearly and safely.

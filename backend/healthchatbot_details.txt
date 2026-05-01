@@ -1,2 +1,0 @@
-Client ID: <set GOOGLE_CLIENT_ID in .env>
-Client Secret: <set GOOGLE_CLIENT_SECRET in .env>

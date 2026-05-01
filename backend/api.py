@@ -6,12 +6,14 @@ health metrics logging, medication tracking, and API endpoints.
 """
 
 # FastAPI core - Web framework for building APIs
-from fastapi import FastAPI, Request, HTTPException, Depends
+from fastapi import FastAPI, Request, HTTPException, Depends, UploadFile, File
 # Response types - HTML and redirect responses for web UI
 from fastapi.responses import HTMLResponse, RedirectResponse
 # Pydantic - Data validation and serialization
 from pydantic import BaseModel
 from typing import Optional
+# tempfile - Temporary file handling for uploads
+import tempfile
 # os - Environment variable and path handling
 import os
 # urllib.parse - URL encoding for OAuth parameters
@@ -33,6 +35,8 @@ from .database import engine, Base, get_db, disconnect_db
 from sqlalchemy.ext.asyncio import AsyncSession
 # SQLAlchemy select - Building SQL queries
 from sqlalchemy.future import select
+# SQLAlchemy text - Executing raw SQL statements
+from sqlalchemy import text
 
 # CRUD operations - User, health logs, medications, and onboarding functions
 from .crud import (
@@ -91,6 +95,7 @@ class MetricsParseRequest(BaseModel):
 async def startup():
     """Initialize database tables on application startup"""
     async with engine.begin() as conn:
+        await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector;"))
         await conn.run_sync(Base.metadata.create_all)
     print("Database connected")
 
@@ -597,6 +602,45 @@ async def get_user_profile_endpoint(
         raise HTTPException(status_code=400, detail=str(e))
 
 
+
+# ============================================
+# HEALTH GOALS ENDPOINTS
+# ============================================
+
+class GoalsUpdate(BaseModel):
+    health_goals: Optional[str] = None
+    weight_kg: Optional[float] = None
+    fitness_level: Optional[str] = None
+
+@app.patch("/user/{user_id}/goals")
+async def update_user_goals(
+    user_id: int,
+    data: GoalsUpdate,
+    db: AsyncSession = Depends(get_db)
+):
+    """Update user's health goals, target weight, and fitness level"""
+    try:
+        result = await db.execute(select(User).where(User.id == user_id))
+        user = result.scalar_one_or_none()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        if data.health_goals is not None:
+            user.health_goals = data.health_goals
+        if data.weight_kg is not None:
+            user.weight_kg = data.weight_kg
+        if data.fitness_level is not None:
+            user.fitness_level = data.fitness_level
+
+        await db.commit()
+        await db.refresh(user)
+        return {"status": "success", "message": "✅ Goals updated successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 # ============================================
 # MEDICATION ENDPOINTS
 # ============================================
@@ -891,8 +935,25 @@ async def export_health_report(
 
 
 # ============================================
-# CHATBOT ENDPOINTS
+# CHATBOT & AI ENDPOINTS
 # ============================================
+
+@app.get("/user/{user_id}/vitals-summary")
+async def get_vitals_summary(user_id: int, db: AsyncSession = Depends(get_db)):
+    """Generate a quick AI summary of the user's recent vitals for the dashboard."""
+    logs_data = await get_user_health_logs(db, user_id, days=14)
+    health_logs = [
+        {
+            "metric_type": log.metric_type,
+            "value": log.value,
+            "unit": log.unit,
+            "created_at": log.created_at.isoformat(),
+        }
+        for log in logs_data
+    ]
+    from .chatbot import generate_vitals_summary
+    summary = generate_vitals_summary(health_logs)
+    return {"status": "success", "summary": summary}
 
 @app.post("/chat")
 async def chat_endpoint(request: ChatRequest):
@@ -923,3 +984,131 @@ async def parse_metrics_endpoint(request: MetricsParseRequest):
         }
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+# ============================================
+# RAG KNOWLEDGE BASE ENDPOINTS
+# ============================================
+
+from .rag.ingestion import ingest_all_documents, ingest_file
+from .rag.vector_store import get_collection_stats, delete_chunks_by_source
+from .rag.config import DOCUMENTS_DIR
+from fastapi import UploadFile, File as FastAPIFile
+import shutil
+
+
+@app.post("/rag/ingest")
+async def rag_ingest(force: bool = False):
+    """
+    Ingest all documents in data/documents/ into the vector store.
+    Set force=true to re-index files that are already indexed.
+    """
+    try:
+        results = ingest_all_documents(force=force)
+        stats = get_collection_stats()
+        return {
+            "status": "success",
+            "files_processed": results,
+            "total_chunks": stats["total_chunks"],
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Ingestion failed: {str(e)}")
+
+
+@app.post("/rag/upload/{user_id}")
+async def rag_upload(user_id: int, file: UploadFile = FastAPIFile(...), force: bool = False):
+    """
+    Upload a document (PDF/TXT/MD) and immediately ingest it into the vector store.
+    """
+    allowed = {".pdf", ".txt", ".md"}
+    suffix = "." + file.filename.split(".")[-1].lower() if "." in file.filename else ""
+    if suffix not in allowed:
+        raise HTTPException(status_code=400, detail=f"Unsupported file type '{suffix}'. Allowed: {allowed}")
+
+    dest = DOCUMENTS_DIR / file.filename
+    try:
+        with dest.open("wb") as f:
+            shutil.copyfileobj(file.file, f)
+
+        count = ingest_file(dest, force=force, user_id=user_id)
+        
+        # Delete file after ingestion to save space (it is permanently in PostgreSQL)
+        if dest.exists():
+            dest.unlink()
+            
+        stats = get_collection_stats()
+        return {
+            "status": "success",
+            "file": file.filename,
+            "chunks_indexed": count,
+            "total_chunks": stats["total_chunks"],
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Upload/ingest failed: {str(e)}")
+
+
+@app.get("/rag/stats")
+async def rag_stats():
+    """Return current vector store statistics."""
+    try:
+        stats = get_collection_stats()
+        # List files in documents directory
+        docs = [f.name for f in DOCUMENTS_DIR.iterdir() if f.is_file()]
+        return {
+            "status": "success",
+            **stats,
+            "document_files": docs,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/rag/delete/{filename}")
+async def rag_delete(filename: str):
+    """Remove all chunks belonging to a specific document from the vector store."""
+    try:
+        removed = delete_chunks_by_source(filename)
+        return {
+            "status": "success",
+            "file": filename,
+            "chunks_removed": removed,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================
+# RAG DOCUMENT UPLOAD ENDPOINT
+# ============================================
+
+@app.post("/rag/upload/{user_id}")
+async def upload_user_document(user_id: int, file: UploadFile = File(...)):
+    """
+    Accept a PDF or TXT file upload from a logged-in user,
+    ingest it into the vector store tagged with their user_id,
+    so the RAG retriever can return personalised results.
+    """
+    from .rag.ingestion import ingest_file
+
+    allowed = {".pdf", ".txt"}
+    suffix = Path(file.filename).suffix.lower()
+    if suffix not in allowed:
+        raise HTTPException(status_code=400, detail=f"File type '{suffix}' not supported. Use PDF or TXT.")
+
+    try:
+        contents = await file.read()
+        with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+            tmp.write(contents)
+            tmp_path = Path(tmp.name)
+
+        chunks_indexed = ingest_file(tmp_path, force=True, user_id=user_id)
+        tmp_path.unlink(missing_ok=True)  # clean up temp file
+
+        return {
+            "status": "success",
+            "file": file.filename,
+            "chunks_indexed": chunks_indexed,
+            "message": f"✅ '{file.filename}' ingested with {chunks_indexed} chunks for user {user_id}."
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Ingestion failed: {str(e)}")

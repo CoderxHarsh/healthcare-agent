@@ -8,6 +8,8 @@ SQLAlchemy ORM models for users, health logs, medications, and adherence trackin
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, func, Text, Float, ForeignKey, Date, Time
 # Database base class - Provides ORM foundation for all models
 from .database import Base
+# pgvector - Vector column type for storing embeddings
+from pgvector.sqlalchemy import Vector
 
 class User(Base):
     """
@@ -92,3 +94,19 @@ class MedicationLog(Base):
     scheduled_date = Column(Date, nullable=False)   # The date this dose was scheduled
     status = Column(String, nullable=False)         # "taken", "skipped", "missed"
     logged_at = Column(DateTime(timezone=True), server_default=func.now())  # When user marked it
+
+class KnowledgeChunk(Base):
+    """
+    RAG vector store model - Stores embedded document chunks for knowledge retrieval.
+    User ID is nullable (None = Global Admin Knowledge).
+    """
+    __tablename__ = "knowledge_chunks"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True)
+    source = Column(String, nullable=False)
+    page = Column(Integer)
+    chunk_index = Column(Integer)
+    text = Column(Text, nullable=False)
+    embedding = Column(Vector(3072)) # gemini-embedding-2 produces 3072-dimensional vectors
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
