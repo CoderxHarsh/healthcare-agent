@@ -1220,7 +1220,7 @@ if st.session_state.user:
             st.header("📊 Your Wellness Tracker")
 
             # Tabs for different views
-            tab1, tab2, tab3 = st.tabs(["📈 View Logs", "➕ Add Metric", "📋 Summary"])
+            tab1, tab2, tab3, tab4 = st.tabs(["📈 View Logs", "➕ Add Metric", "📋 Summary", "📥 Bulk Import"])
             
             with tab1:
                 st.subheader("Health Metrics History")
@@ -1372,6 +1372,41 @@ if st.session_state.user:
                         
                 except Exception as e:
                     st.error(f"❌ Error: {str(e)}")
+
+            with tab4:
+                st.subheader("📥 Bulk Import Health Logs")
+                st.markdown("Upload a CSV, JSON, or XML file containing your historical health logs.")
+                st.info("Expected columns/keys: `metric_type`, `value`, `unit` (optional), `date` (optional).")
+                
+                uploaded_bulk = st.file_uploader(
+                    "Upload file",
+                    type=["csv", "json", "xml"],
+                    key="bulk_import_upload"
+                )
+                
+                if uploaded_bulk is not None:
+                    if st.button("🚀 Process Import", use_container_width=True):
+                        with st.spinner("Processing file..."):
+                            files = {"file": (uploaded_bulk.name, uploaded_bulk.getvalue(), uploaded_bulk.type)}
+                            try:
+                                res = requests.post(
+                                    f"{API_BASE_URL}/health-logs/{st.session_state.user_id}/upload",
+                                    files=files,
+                                    timeout=30
+                                )
+                                if res.status_code == 200:
+                                    data = res.json()
+                                    if data.get("skipped", 0) > 0:
+                                        st.warning(data.get("message"))
+                                    else:
+                                        st.success(data.get("message"))
+                                        st.balloons()
+                                    # Clear cached logs to force refresh on dashboard
+                                    st.session_state.health_logs = None
+                                else:
+                                    st.error(f"❌ Error: {res.json().get('detail', 'Unknown error')}")
+                            except Exception as e:
+                                st.error(f"❌ Connection Error: {e}")
 
 
 else:

@@ -28,6 +28,10 @@ from dotenv import load_dotenv, find_dotenv
 from pathlib import Path
 # datetime - Date and time operations
 from datetime import date, datetime
+import pandas as pd
+import json
+import xml.etree.ElementTree as ET
+from io import BytesIO
 
 # Database connection, session management, and table initialization
 from .database import engine, Base, get_db, disconnect_db
@@ -404,6 +408,84 @@ async def log_from_text(
         "message": f"✅ Logged {len(logged_metrics)} health metric(s)",
         "metrics": logged_metrics
     }
+
+
+@app.post("/health-logs/{user_id}/upload")
+async def upload_health_logs(
+    user_id: int,
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db)
+):
+    """Upload health logs via CSV, JSON, or XML"""
+    contents = await file.read()
+    filename = file.filename.lower()
+    
+    valid_records = []
+    skipped_count = 0
+    
+    try:
+        if filename.endswith(".csv"):
+            df = pd.read_csv(BytesIO(contents))
+            records = df.to_dict(orient="records")
+        elif filename.endswith(".json"):
+            records = json.loads(contents)
+            if not isinstance(records, list):
+                raise ValueError("JSON must be a list of records")
+        elif filename.endswith(".xml"):
+            root = ET.fromstring(contents)
+            records = []
+            for child in root:
+                record = {}
+                for subchild in child:
+                    record[subchild.tag] = subchild.text
+                records.append(record)
+        else:
+            raise HTTPException(status_code=400, detail="Unsupported file format. Please upload CSV, JSON, or XML.")
+            
+        for rec in records:
+            # Flexible keys matching
+            metric_type = rec.get("metric_type") or rec.get("metric") or rec.get("type")
+            value = rec.get("value") or rec.get("val")
+            unit = rec.get("unit") or rec.get("u")
+            
+            if not metric_type or value is None:
+                skipped_count += 1
+                continue
+                
+            date_str = rec.get("date") or rec.get("timestamp") or rec.get("created_at")
+            created_at = None
+            if date_str:
+                try:
+                    # Parse basic ISO or standard dates
+                    created_at = datetime.fromisoformat(str(date_str).replace('Z', '+00:00'))
+                except Exception:
+                    pass
+            
+            # Default unit if missing
+            if not unit:
+                unit = ""
+                
+            await create_health_log(
+                db,
+                user_id=user_id,
+                metric_type=str(metric_type).lower().replace(" ", "_"),
+                value=str(value),
+                unit=str(unit),
+                notes=rec.get("notes"),
+                source="bulk_import",
+                created_at=created_at
+            )
+            valid_records.append(rec)
+            
+        return {
+            "status": "success",
+            "message": f"✅ Imported {len(valid_records)} records. ⚠️ Skipped {skipped_count} invalid rows." if skipped_count else f"✅ Imported {len(valid_records)} records.",
+            "imported": len(valid_records),
+            "skipped": skipped_count
+        }
+            
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to parse file: {str(e)}")
 
 
 @app.get("/health-logs/{user_id}")

@@ -67,7 +67,8 @@ async def create_health_log(
     value: str,
     unit: str,
     notes: Optional[str] = None,
-    source: str = "manual"
+    source: str = "manual",
+    created_at: Optional[datetime] = None
 ) -> HealthLog:
     """Create a new health log entry"""
     health_log = HealthLog(
@@ -78,6 +79,9 @@ async def create_health_log(
         notes=notes,
         source=source
     )
+    if created_at:
+        health_log.created_at = created_at
+        
     db.add(health_log)
     await db.commit()
     await db.refresh(health_log)
