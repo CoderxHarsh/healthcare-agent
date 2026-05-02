@@ -1143,11 +1143,25 @@ if st.session_state.user:
         elif page == "Chat":
             st.divider()
 
-            # Ensure profile and logs are loaded
+            # Load profile from API if not already loaded
             if "user_profile" not in st.session_state or st.session_state.user_profile is None:
-                st.session_state.user_profile = {}
+                try:
+                    pr = requests.get(f"{API_BASE_URL}/user/{st.session_state.user_id}/profile", timeout=5)
+                    st.session_state.user_profile = pr.json().get("profile", {}) if pr.status_code == 200 else {}
+                except Exception:
+                    st.session_state.user_profile = {}
+
+            # Load health logs from API if not already loaded
             if "health_logs" not in st.session_state or st.session_state.health_logs is None:
-                st.session_state.health_logs = []
+                try:
+                    logs_response = requests.get(
+                        f"{API_BASE_URL}/health-logs/{st.session_state.user_id}",
+                        params={"days": 90},
+                        timeout=5
+                    )
+                    st.session_state.health_logs = logs_response.json().get("logs", []) if logs_response.status_code == 200 else []
+                except Exception:
+                    st.session_state.health_logs = []
 
             # Display chat messages
             for msg in st.session_state.messages:

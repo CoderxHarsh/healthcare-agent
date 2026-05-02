@@ -2,7 +2,7 @@
 RAG Document Ingestion
 =======================
 Loads documents from data/documents/, chunks them, embeds them,
-and stores them in ChromaDB.
+and stores them in PostgreSQL using pgvector.
 
 Supported file types:
   - PDF  (.pdf)   — via pypdf
@@ -225,7 +225,7 @@ def ingest_file(path: Path, force: bool = False, user_id: Optional[int] = None) 
     # 3. Embed with rate-limit handling
     all_embeddings = _embed_all_chunks(all_texts)
 
-    # 4. Upsert into ChromaDB / PostgreSQL
+    # 4. Upsert into PostgreSQL
     add_chunks(all_embeddings, all_texts, all_metadatas, user_id=user_id)
     logger.info(f"  ✅ Indexed {len(all_texts)} chunks from '{source_name}'")
     return len(all_texts)

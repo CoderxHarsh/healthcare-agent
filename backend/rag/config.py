@@ -18,11 +18,9 @@ load_dotenv(env_path)
 ROOT_DIR = Path(__file__).parent.parent.parent          # d:/Projects/HealthCareAGENT
 DATA_DIR = ROOT_DIR / "data"
 DOCUMENTS_DIR = DATA_DIR / "documents"                  # Drop PDFs / TXTs here
-CHROMA_DIR = DATA_DIR / "chroma_db"                    # Persisted vector store
 
 # Create dirs if missing
 DOCUMENTS_DIR.mkdir(parents=True, exist_ok=True)
-CHROMA_DIR.mkdir(parents=True, exist_ok=True)
 
 # ─────────────────────────────────────────────
 # Embedding model
@@ -30,11 +28,6 @@ CHROMA_DIR.mkdir(parents=True, exist_ok=True)
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 EMBEDDING_MODEL = "gemini-embedding-2"          # Google's latest embedding model
 EMBEDDING_TASK_TYPE = "retrieval_document"             # For indexing docs
-
-# ─────────────────────────────────────────────
-# ChromaDB collection
-# ─────────────────────────────────────────────
-CHROMA_COLLECTION_NAME = "healthcare_knowledge"
 
 # ─────────────────────────────────────────────
 # Chunking settings

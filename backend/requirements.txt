@@ -20,9 +20,4 @@ pandas # for data manipulation and analysis
 fpdf2 # for PDF generation (Windows-compatible)
 
 # RAG pipeline
-chromadb         # local vector store (persisted)
-pypdf            # PDF text extraction
-
-# Web Scraping (Standalone Scripts)
-trafilatura      # main article extractor
-beautifulsoup4   # fallback HTML parser
+pypdf            # PDF text extraction

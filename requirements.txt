@@ -12,7 +12,6 @@ langchain             # Core framework for chaining LLM calls and routing tools
 langchain-groq        # Groq integration for fast LLM inference
 google-genai          # Google's new SDK for Gemini embeddings (used in RAG)
 google-generativeai   # Google's legacy SDK (kept for backwards compatibility)
-chromadb              # Local vector database to store document embeddings for RAG
 
 # ==========================================
 # 🗄️ DATABASE (PostgreSQL)
