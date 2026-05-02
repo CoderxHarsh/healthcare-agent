@@ -398,4 +398,4 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 
 ---
 
-*Built with ❤️ as part of the Digital Health & Wellness Technology Hackathon*
+Built with ❤️ by @meojaswi and @CoderxHarsh
