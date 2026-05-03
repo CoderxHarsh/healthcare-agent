@@ -20,5 +20,6 @@ jinja2
 
 # LLM
 google-generativeai
+google-genai
 langchain==0.3.14
 langchain-groq==0.2.3
