@@ -34,7 +34,7 @@ if not api_key:
 
 # model = ChatGroq(model="grok-2", temperature=0.5)
 model = ChatGroq(
-    model = "openai/gpt-oss-20b",
+    model = "llama-3.1-8b-instant",
     api_key = api_key,
     temperature =0.6,
     max_tokens = 2048

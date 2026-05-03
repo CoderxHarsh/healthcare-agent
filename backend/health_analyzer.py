@@ -39,7 +39,7 @@ class HealthAnalyzer:
             raise RuntimeError("Missing GROK_API_KEY in environment variables")
         
         self.model = ChatGroq(
-            model="openai/gpt-oss-20b",
+            model="llama-3.1-8b-instant",
             api_key=api_key,
             temperature=0.5,
             max_tokens=512
