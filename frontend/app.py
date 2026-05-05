@@ -318,6 +318,26 @@ if "user_profile" not in st.session_state:
 if "health_logs" not in st.session_state:
     st.session_state.health_logs = None
 
+# -------------------------
+# SESSION RESTORE ON REFRESH
+# If session_state lost (page refresh) but URL still carries user_id,
+# silently restore the session from the backend — no re-login needed.
+# -------------------------
+_qp = st.query_params
+if not st.session_state.user and "user_id" in _qp:
+    try:
+        _uid = int(_qp["user_id"])
+        _restore_resp = requests.get(
+            f"{API_BASE_URL}/user/{_uid}/profile", timeout=10
+        )
+        if _restore_resp.status_code == 200:
+            _profile = _restore_resp.json().get("profile", {})
+            st.session_state.user = _profile.get("name") or "User"
+            st.session_state.user_id = _profile.get("id")
+            st.session_state.onboarded = "true" if _profile.get("is_onboarded") else "false"
+    except Exception:
+        pass  # If restore fails, fall through to landing page normally
+
 
 # -------------------------
 # CHECK LOGIN (FROM OAUTH CALLBACK)
@@ -375,7 +395,9 @@ if "code" in params and not st.session_state.user:
                             st.session_state.user = user_data["name"]
                             st.session_state.user_id = user_data["user_id"]
                             st.session_state.onboarded = str(user_data["is_onboarded"]).lower()
-                            st.query_params.clear()
+                            # Persist user_id + onboarded in URL so session survives page refresh
+                            st.query_params["user_id"] = str(user_data["user_id"])
+                            st.query_params["onboarded"] = str(user_data["is_onboarded"]).lower()
                             st.rerun()
                         else:
                             st.error(f"❌ Failed to save user (status {save_response.status_code}). Please try again.")
@@ -524,7 +546,9 @@ def show_onboarding_page():
                         if response2.status_code == 200:
                             st.session_state.onboarded = "true"
                             st.session_state.page = "chat"
-                            st.query_params.clear()
+                            # Keep user_id in URL so refresh still works after onboarding
+                            st.query_params["user_id"] = str(st.session_state.user_id)
+                            st.query_params["onboarded"] = "true"
                             st.success("✅ Onboarding completed successfully!")
                             st.balloons()
                             import time
@@ -606,6 +630,7 @@ if st.session_state.user:
                 st.session_state.user_profile = None
                 st.session_state.health_logs = None
                 st.session_state.messages = []
+                # Clear URL params so a refresh doesn't re-login the user
                 st.query_params.clear()
                 import time
                 time.sleep(0.5)
