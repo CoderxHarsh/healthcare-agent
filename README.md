@@ -158,7 +158,7 @@ The agent automatically extracts health metrics from natural language (e.g. *"My
 
 ### 1. Clone the Repository
 ```bash
-git clone https://github.com/YOUR_USERNAME/HealthCareAGENT.git
+git clone https://github.com/CoderxHarsh/HealthCareAGENT.git
 cd HealthCareAGENT
 ```
 
