@@ -12,7 +12,7 @@ from .tools import get_tool_context
 from .medlineplus import get_medical_info
 # RAG pipeline — retrieve grounded knowledge from the vector store
 from .rag.retriever import retrieve, format_rag_context
-
+from langchain_anthropic import ChatAnthropic
 # Load .env from root directory (works from any location)
 env_path = find_dotenv() or Path(__file__).parent.parent / ".env"
 load_dotenv(env_path)

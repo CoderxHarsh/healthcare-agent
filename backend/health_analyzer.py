@@ -20,7 +20,7 @@ from pathlib import Path
 env_path = find_dotenv() or Path(__file__).parent.parent / ".env"
 load_dotenv(env_path)
 
-from langchain_groq import ChatGroq
+from langchain_anthropic import ChatAnthropic
 
 # ============================================
 # HEALTH ANALYZER CLASS
@@ -34,12 +34,12 @@ class HealthAnalyzer:
     
     def __init__(self):
         """Initialize the analyzer with LLM model"""
-        api_key = os.getenv("GROK_API_KEY")
+        api_key = os.getenv("ANTHROPIC_API_KEY")
         if not api_key:
-            raise RuntimeError("Missing GROK_API_KEY in environment variables")
+            raise RuntimeError("Missing ANTHROPIC_API_KEY in environment variables")
         
-        self.model = ChatGroq(
-            model="llama-3.1-8b-instant",
+        self.model = ChatAnthropic(
+            model="claude-3-5-haiku-20241022",
             api_key=api_key,
             temperature=0.5,
             max_tokens=512
