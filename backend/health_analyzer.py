@@ -10,6 +10,7 @@ Analyzes user health data to generate personalized AI insights using:
 """
 
 import os
+import logging
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
 import statistics
@@ -21,6 +22,13 @@ env_path = find_dotenv() or Path(__file__).parent.parent / ".env"
 load_dotenv(env_path)
 
 from langchain_anthropic import ChatAnthropic
+
+# Configure logging
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 # ============================================
 # HEALTH ANALYZER CLASS
@@ -36,14 +44,29 @@ class HealthAnalyzer:
         """Initialize the analyzer with LLM model"""
         api_key = os.getenv("ANTHROPIC_API_KEY")
         if not api_key:
+            logger.error("❌ ANTHROPIC_API_KEY not found in environment variables")
             raise RuntimeError("Missing ANTHROPIC_API_KEY in environment variables")
         
-        self.model = ChatAnthropic(
-            model="claude-3-5-haiku-20241022",
-            api_key=api_key,
-            temperature=0.5,
-            max_tokens=512
-        )
+        logger.info("✅ Initializing HealthAnalyzer with Anthropic API")
+        logger.debug(f"API Key present: {len(api_key)} characters")
+        
+        try:
+            # Use the latest available Claude Haiku model
+            model_name = "claude-haiku-4-5-20251001"
+            logger.debug(f"Initializing model: {model_name}")
+            
+            self.model = ChatAnthropic(
+                model=model_name,
+                api_key=api_key,
+                temperature=0.5,
+                max_tokens=512
+            )
+            logger.info(f"✅ ChatAnthropic model '{model_name}' initialized successfully")
+            self.model_name = model_name
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to initialize ChatAnthropic: {str(e)}")
+            raise
         
         # Define normal ranges for common health metrics (can be customized per user)
         self.normal_ranges = {
@@ -301,14 +324,32 @@ class HealthAnalyzer:
         Returns:
             3-4 line personalized health analysis string
         """
+        user_name = user_profile.get("name", "User")
+        user_id = user_profile.get("id", "unknown")
+        
+        logger.info(f"🔄 Generating AI analysis for User {user_id} ({user_name})")
+        
         if not health_logs:
+            logger.warning(f"⚠️ No health logs for User {user_id}")
             return "No health data available. Start logging your vitals to get personalized insights."
         
+        logger.debug(f"📊 Processing {len(health_logs)} health log entries")
+        
         # Analyze the health profile
-        analysis = self.analyze_health_profile(user_profile, health_logs)
+        try:
+            analysis = self.analyze_health_profile(user_profile, health_logs)
+            logger.debug(f"✅ Health profile analyzed: {len(analysis.get('metric_trends', {}))} metrics")
+        except Exception as e:
+            logger.error(f"❌ Error in analyze_health_profile: {str(e)}", exc_info=True)
+            raise
         
         # Assess risk factors
-        risk_factors = self.assess_risk_factors(analysis)
+        try:
+            risk_factors = self.assess_risk_factors(analysis)
+            logger.debug(f"⚠️ Risk factors identified: {len(risk_factors)}")
+        except Exception as e:
+            logger.error(f"❌ Error in assess_risk_factors: {str(e)}", exc_info=True)
+            risk_factors = []
         
         # Build context for LLM
         name = user_profile.get("name", "User")
@@ -357,28 +398,53 @@ REQUIREMENTS:
 
 Analysis:"""
 
+        logger.debug(f"📝 Prompt prepared for LLM (length: {len(prompt)} chars)")
+        
         try:
+            logger.info(f"🚀 Calling LLM for User {user_id}...")
             response = self.model.invoke(prompt)
+            logger.info(f"✅ LLM response received for User {user_id}")
+            
             analysis_text = response.content.strip()
+            logger.debug(f"📄 Raw response: {analysis_text[:100]}...")
             
             # Ensure it's 3-4 lines
             sentences = analysis_text.split(". ")
             if len(sentences) > 4:
                 analysis_text = ". ".join(sentences[:4]) + "."
             
+            logger.info(f"✅ AI analysis successfully generated for User {user_id}")
             return analysis_text
-        except Exception as e:
-            print(f"LLM error: {e}")
-            # Fallback to statistical summary if LLM fails
-            trend_summary = ", ".join([
-                f"{metric} is {data['trend']}"
-                for metric, data in analysis.get("metric_trends", {}).items()
-                if data.get("trend") != "insufficient_data"
-            ])
             
-            if trend_summary:
-                return f"Your health metrics show: {trend_summary}. Keep monitoring your vitals and maintain your current routine. Consult a doctor if any readings seem unusual."
-            else:
+        except ImportError as e:
+            logger.error(f"❌ Import Error - ChatAnthropic not available: {str(e)}", exc_info=True)
+            logger.error("   Make sure to install: pip install langchain-anthropic")
+            
+        except AttributeError as e:
+            logger.error(f"❌ Attribute Error - Check LLM model configuration: {str(e)}", exc_info=True)
+            
+        except ValueError as e:
+            logger.error(f"❌ Value Error - Invalid API key or model name: {str(e)}", exc_info=True)
+            
+        except TimeoutError as e:
+            logger.error(f"❌ Timeout Error - LLM API call took too long: {str(e)}", exc_info=True)
+            
+        except Exception as e:
+            logger.error(f"❌ Unexpected LLM Error: {type(e).__name__}: {str(e)}", exc_info=True)
+        
+        # Fallback to statistical summary if LLM fails
+        logger.info(f"⚙️ Falling back to statistical summary for User {user_id}")
+        trend_summary = ", ".join([
+            f"{metric} is {data['trend']}"
+            for metric, data in analysis.get("metric_trends", {}).items()
+            if data.get("trend") != "insufficient_data"
+        ])
+        
+        if trend_summary:
+            fallback_text = f"Your health metrics show: {trend_summary}. Keep monitoring your vitals and maintain your current routine. Consult a doctor if any readings seem unusual."
+            logger.warning(f"📊 Using fallback analysis for User {user_id}")
+            return fallback_text
+        else:
                 return "Keep logging your health data consistently for personalized insights. Regular tracking helps us understand your health patterns better."
 
 

@@ -4,6 +4,7 @@ streamlit
 requests
 python-dotenv  #for loading environment variables from .env file
 langchain==1.0.5 
+langchain_anthropic # Anthropic LLM for ML Predictions on Dashboard.
 langchain-groq==1.0.0
 langchain-google-genai  # Google embeddings for RAG
 langchain-community     # LangChain community integrations
@@ -21,4 +22,4 @@ pandas # for data manipulation and analysis
 fpdf2 # for PDF generation (Windows-compatible)
 
 # RAG pipeline
-pypdf            # PDF text extraction
+pypdf            # PDF text extraction

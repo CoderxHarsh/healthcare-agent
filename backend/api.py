@@ -16,6 +16,8 @@ from typing import Optional
 import tempfile
 # os - Environment variable and path handling
 import os
+# logging - Debug and error logging
+import logging
 # urllib.parse - URL encoding for OAuth parameters
 import urllib.parse
 # httpx - Async HTTP client for Google API calls
@@ -66,6 +68,14 @@ from .chatbot import get_response
 from .health_analyzer import get_health_analysis
 
 app = FastAPI()
+
+# Configure logging
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+logger.info("✅ HealthCareAGENT API started")
 
 # CORS middleware — allow Streamlit Cloud (and localhost) to call this API
 from fastapi.middleware.cors import CORSMiddleware
@@ -1025,14 +1035,23 @@ async def export_health_report(
 @app.get("/user/{user_id}/vitals-summary")
 async def get_vitals_summary(user_id: int, db: AsyncSession = Depends(get_db)):
     """Generate a personalized AI analysis of the user's health using ML model."""
+    logger.info(f"📋 GET /user/{user_id}/vitals-summary - Starting analysis")
+    
     try:
         # Get user profile
+        logger.debug(f"🔍 Fetching profile for user {user_id}...")
         profile = await get_user_profile(db, user_id)
         if not profile:
+            logger.warning(f"❌ User {user_id} not found in database")
             raise HTTPException(status_code=404, detail="User not found")
         
-        # Get recent health logs
-        logs_data = await get_user_health_logs(db, user_id, days=30)
+        logger.info(f"✅ Found user: {profile.name}")
+        
+        # Get recent health logs (90 days to handle older test data)
+        logger.debug(f"📊 Fetching health logs for user {user_id} (last 90 days)...")
+        logs_data = await get_user_health_logs(db, user_id, days=90)
+        logger.info(f"✅ Retrieved {len(logs_data)} health log entries")
+        
         health_logs = [
             {
                 "metric_type": log.metric_type,
@@ -1061,7 +1080,10 @@ async def get_vitals_summary(user_id: int, db: AsyncSession = Depends(get_db)):
         }
         
         # Generate AI analysis
+        logger.info(f"🤖 Generating AI analysis for user {user_id}...")
         analysis = get_health_analysis(profile_dict, health_logs)
+        logger.info(f"✅ AI analysis completed for user {user_id}")
+        logger.debug(f"📄 Analysis preview: {analysis[:80]}...")
         
         return {
             "status": "success",
@@ -1071,12 +1093,171 @@ async def get_vitals_summary(user_id: int, db: AsyncSession = Depends(get_db)):
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error generating vitals summary: {str(e)}")
+        logger.error(f"❌ Error generating vitals summary for user {user_id}: {type(e).__name__}: {str(e)}", exc_info=True)
         return {
             "status": "error",
-            "summary": "Unable to generate analysis at this moment. Please try again later.",
-            "error": str(e)
+            "summary": "Unable to generate analysis at this moment. Please try again.",
+            "error": str(e),
+            "debug_info": f"{type(e).__name__}: Check server logs for details"
         }
+
+@app.get("/debug/user/{user_id}/logs")
+async def debug_user_logs(user_id: int, db: AsyncSession = Depends(get_db)):
+    """
+    DEBUG ENDPOINT: Show ALL health logs for a user with NO date filtering.
+    Use this to verify data exists in the DB regardless of timezone issues.
+    """
+    try:
+        # Raw SQL - no date filter, no ORM tricks
+        result = await db.execute(
+            text("SELECT id, metric_type, value, unit, created_at, source FROM health_logs WHERE user_id = :uid ORDER BY created_at DESC LIMIT 50"),
+            {"uid": user_id}
+        )
+        rows = result.fetchall()
+        logs = [
+            {"id": r[0], "metric_type": r[1], "value": r[2], "unit": r[3],
+             "created_at": str(r[4]), "source": r[5]}
+            for r in rows
+        ]
+        # Also check user exists
+        user_result = await db.execute(text("SELECT id, name, email, is_onboarded FROM users WHERE id = :uid"), {"uid": user_id})
+        user_row = user_result.fetchone()
+        return {
+            "user": {"id": user_row[0], "name": user_row[1], "email": user_row[2], "is_onboarded": user_row[3]} if user_row else None,
+            "total_logs_in_db": len(logs),
+            "logs": logs,
+            "hint": "If logs exist here but not on dashboard, it's a timezone filter issue in the ORM query."
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.get("/debug/llm-test")
+async def debug_llm_test():
+    """
+    DEBUG ENDPOINT: Test if LLM is working
+    Returns detailed diagnostic information
+    """
+    logger.info("🧪 DEBUG: Testing LLM connectivity and configuration")
+    
+    results = {
+        "test_name": "LLM Debug Test",
+        "tests": {}
+    }
+    
+    # Test 1: Check API Key
+    logger.debug("📋 Test 1: Checking ANTHROPIC_API_KEY...")
+    api_key = os.getenv("ANTHROPIC_API_KEY")
+    if api_key:
+        results["tests"]["api_key"] = {
+            "status": "✅ PASS",
+            "message": f"API Key found ({len(api_key)} chars)",
+            "key_preview": f"{api_key[:10]}...{api_key[-5:]}"
+        }
+        logger.info("✅ API Key present")
+    else:
+        results["tests"]["api_key"] = {
+            "status": "❌ FAIL",
+            "message": "ANTHROPIC_API_KEY not found in environment",
+            "solution": "Add ANTHROPIC_API_KEY to .env file"
+        }
+        logger.error("❌ API Key missing!")
+        return results
+    
+    # Test 2: Initialize HealthAnalyzer
+    logger.debug("📋 Test 2: Initializing HealthAnalyzer...")
+    try:
+        from .health_analyzer import HealthAnalyzer
+        analyzer = HealthAnalyzer()
+        results["tests"]["analyzer_init"] = {
+            "status": "✅ PASS",
+            "message": "HealthAnalyzer initialized successfully"
+        }
+        logger.info("✅ HealthAnalyzer initialized")
+    except Exception as e:
+        results["tests"]["analyzer_init"] = {
+            "status": "❌ FAIL",
+            "message": str(e),
+            "error_type": type(e).__name__
+        }
+        logger.error(f"❌ Failed to initialize HealthAnalyzer: {str(e)}")
+        return results
+    
+    # Test 3: Test LLM with simple prompt
+    logger.debug("📋 Test 3: Testing LLM with simple prompt...")
+    try:
+        logger.info("🚀 Calling LLM with test prompt...")
+        test_prompt = "Say 'LLM is working!' in one sentence."
+        response = analyzer.model.invoke(test_prompt)
+        test_response = response.content.strip()
+        
+        results["tests"]["llm_call"] = {
+            "status": "✅ PASS",
+            "message": "LLM responded successfully",
+            "response": test_response
+        }
+        logger.info(f"✅ LLM Test successful: {test_response}")
+        
+    except ImportError as e:
+        results["tests"]["llm_call"] = {
+            "status": "❌ FAIL",
+            "error_type": "ImportError",
+            "message": "Missing dependency: langchain-anthropic",
+            "solution": "Run: pip install langchain-anthropic",
+            "details": str(e)
+        }
+        logger.error(f"❌ ImportError: {str(e)}")
+        
+    except ValueError as e:
+        results["tests"]["llm_call"] = {
+            "status": "❌ FAIL",
+            "error_type": "ValueError",
+            "message": "Invalid API key or authentication failed",
+            "details": str(e),
+            "solution": "Check that ANTHROPIC_API_KEY is valid and has credits"
+        }
+        logger.error(f"❌ ValueError: {str(e)}")
+        
+    except TimeoutError as e:
+        results["tests"]["llm_call"] = {
+            "status": "❌ FAIL",
+            "error_type": "TimeoutError",
+            "message": "LLM API call timed out",
+            "details": str(e),
+            "solution": "Check network connection and Anthropic API status"
+        }
+        logger.error(f"❌ TimeoutError: {str(e)}")
+        
+    except ConnectionError as e:
+        results["tests"]["llm_call"] = {
+            "status": "❌ FAIL",
+            "error_type": "ConnectionError",
+            "message": "Cannot connect to Anthropic API",
+            "details": str(e),
+            "solution": "Check internet connection and firewall settings"
+        }
+        logger.error(f"❌ ConnectionError: {str(e)}")
+        
+    except Exception as e:
+        results["tests"]["llm_call"] = {
+            "status": "❌ FAIL",
+            "error_type": type(e).__name__,
+            "message": str(e),
+            "full_trace": repr(e)
+        }
+        logger.error(f"❌ Unexpected error: {type(e).__name__}: {str(e)}", exc_info=True)
+    
+    # Summary
+    passed = sum(1 for test in results["tests"].values() if "✅" in test.get("status", ""))
+    total = len(results["tests"])
+    results["summary"] = f"{passed}/{total} tests passed"
+    
+    if passed == total:
+        logger.info(f"✅ All diagnostic tests passed!")
+    else:
+        logger.warning(f"⚠️ {total - passed} diagnostic tests failed")
+    
+    return results
 
 @app.post("/chat")
 async def chat_endpoint(request: ChatRequest):
@@ -1198,40 +1379,3 @@ async def rag_delete(filename: str):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
-
-# ============================================
-# RAG DOCUMENT UPLOAD ENDPOINT
-# ============================================
-
-@app.post("/rag/upload/{user_id}")
-async def upload_user_document(user_id: int, file: UploadFile = File(...)):
-    """
-    Accept a PDF or TXT file upload from a logged-in user,
-    ingest it into the vector store tagged with their user_id,
-    so the RAG retriever can return personalised results.
-    """
-    from .rag.ingestion import ingest_file
-
-    allowed = {".pdf", ".txt"}
-    suffix = Path(file.filename).suffix.lower()
-    if suffix not in allowed:
-        raise HTTPException(status_code=400, detail=f"File type '{suffix}' not supported. Use PDF or TXT.")
-
-    try:
-        contents = await file.read()
-        with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
-            tmp.write(contents)
-            tmp_path = Path(tmp.name)
-
-        chunks_indexed = ingest_file(tmp_path, force=True, user_id=user_id)
-        tmp_path.unlink(missing_ok=True)  # clean up temp file
-
-        return {
-            "status": "success",
-            "file": file.filename,
-            "chunks_indexed": chunks_indexed,
-            "message": f"✅ '{file.filename}' ingested with {chunks_indexed} chunks for user {user_id}."
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ingestion failed: {str(e)}")

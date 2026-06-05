@@ -16,7 +16,7 @@ from .models import User, HealthLog, Medication, MedicationLog
 # SQLAlchemy functions - SQL functions like NOW()
 from sqlalchemy.sql import func
 # datetime - Date and time operations
-from datetime import datetime, timedelta, date
+from datetime import datetime, timedelta, date, timezone
 # typing - Type hints for function parameters and returns
 from typing import List, Dict, Optional
 
@@ -97,7 +97,7 @@ async def get_user_health_logs(
     """Get user's health logs, optionally filtered by metric type and date range"""
     query = select(HealthLog).where(
         (HealthLog.user_id == user_id) &
-        (HealthLog.created_at >= datetime.utcnow() - timedelta(days=days))
+        (HealthLog.created_at >= datetime.now(timezone.utc) - timedelta(days=days))
     )
     
     if metric_type:
@@ -151,7 +151,7 @@ async def delete_health_log(db: AsyncSession, log_id: int) -> bool:
     health_log = result.scalar_one_or_none()
     
     if health_log:
-        db.delete(health_log)
+        await db.delete(health_log)
         await db.commit()
         return True
     return False

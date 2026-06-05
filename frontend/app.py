@@ -655,9 +655,20 @@ if st.session_state.user:
             # Fetch logs if not loaded
             if "health_logs" not in st.session_state or st.session_state.health_logs is None:
                 try:
-                    logs_response = requests.get(f"{API_BASE_URL}/health-logs/{st.session_state.user_id}", params={"days": 30}, timeout=5)
-                    st.session_state.health_logs = logs_response.json().get("logs", []) if logs_response.status_code == 200 else []
-                except:
+                    logs_response = requests.get(f"{API_BASE_URL}/health-logs/{st.session_state.user_id}", params={"days": 90}, timeout=10)
+                    if logs_response.status_code == 200:
+                        st.session_state.health_logs = logs_response.json().get("logs", [])
+                    else:
+                        st.warning(f"⚠️ Could not load health data (status {logs_response.status_code}): {logs_response.text[:200]}")
+                        st.session_state.health_logs = []
+                except requests.exceptions.ConnectionError:
+                    st.error(f"❌ Cannot connect to backend at {API_BASE_URL}. Is the server running?")
+                    st.session_state.health_logs = []
+                except requests.exceptions.Timeout:
+                    st.warning("⏳ Health data request timed out. Try refreshing.")
+                    st.session_state.health_logs = []
+                except Exception as e:
+                    st.warning(f"⚠️ Failed to load health logs: {str(e)}")
                     st.session_state.health_logs = []
             
             def get_latest(metric_type):
