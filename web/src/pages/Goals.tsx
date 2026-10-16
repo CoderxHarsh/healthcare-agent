@@ -16,23 +16,26 @@ import { api } from '../api/client'
 import { healthLogsQuery } from '../api/queries'
 import type { GoalsPayload, HealthLog, Profile } from '../api/types'
 import { useUser } from '../auth/AuthContext'
+import { Droplets, Flower2, Footprints, Moon, Pencil, Salad, Save, Scale, Target, type LucideIcon } from 'lucide-react'
 import { errorMessage, useToast } from '../components/Toast'
+import { Notice } from '../components/ui'
 import { dailyMeans, extractNumber, parseBloodPressure } from '../lib/metrics'
 
 const FITNESS_LEVELS = ['sedentary', 'light', 'moderate', 'active', 'very active']
 
-const GOAL_ICONS: Array<[icon: string, keywords: string[]]> = [
-  ['⚖️', ['weight', 'kg', 'lose', 'gain']],
-  ['🏃', ['run', 'walk', 'exercise', 'gym', 'fitness', 'cardio']],
-  ['😴', ['sleep', 'rest']],
-  ['🥗', ['diet', 'eat', 'nutrition', 'calorie']],
-  ['🧘', ['stress', 'meditat', 'mental', 'anxiety']],
-  ['💧', ['water', 'hydrat']],
+const GOAL_ICONS: Array<[icon: LucideIcon, keywords: string[]]> = [
+  [Scale, ['weight', 'kg', 'lose', 'gain']],
+  [Footprints, ['run', 'walk', 'exercise', 'gym', 'fitness', 'cardio']],
+  [Moon, ['sleep', 'rest']],
+  [Salad, ['diet', 'eat', 'nutrition', 'calorie']],
+  [Flower2, ['stress', 'meditat', 'mental', 'anxiety']],
+  [Droplets, ['water', 'hydrat']],
 ]
 
-function goalIcon(goal: string): string {
+function GoalIcon({ goal }: { goal: string }) {
   const lower = goal.toLowerCase()
-  return GOAL_ICONS.find(([, keywords]) => keywords.some((k) => lower.includes(k)))?.[0] ?? '🎯'
+  const Icon = GOAL_ICONS.find(([, keywords]) => keywords.some((k) => lower.includes(k)))?.[0] ?? Target
+  return <Icon className="icon" size={20} aria-hidden="true" />
 }
 
 function parseGoals(text: string): string[] {
@@ -63,9 +66,9 @@ function GoalsForm({ userId, profile }: { userId: number; profile: Profile }) {
     try {
       await api.updateGoals(userId, payload)
       await queryClient.invalidateQueries({ queryKey: ['profile', userId] })
-      notify('success', '✅ Goals saved!')
+      notify('success', 'Goals saved.')
     } catch (err) {
-      notify('error', `❌ ${errorMessage(err)}`)
+      notify('error', errorMessage(err))
     } finally {
       setSaving(false)
     }
@@ -102,14 +105,15 @@ function GoalsForm({ userId, profile }: { userId: number; profile: Profile }) {
         </select>
       </label>
       <button type="submit" className="btn btn-primary btn-block" disabled={saving}>
-        {saving ? 'Saving...' : '💾 Save Goals'}
+        <Save className="icon" size={18} aria-hidden="true" />
+        {saving ? 'Saving...' : 'Save goals'}
       </button>
     </form>
   )
 }
 
-const AXIS = { stroke: '#64748B', fontSize: 12 }
-const TOOLTIP_STYLE = { background: '#171A21', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8 }
+const AXIS = { stroke: '#5E6B72', fontSize: 12 }
+const TOOLTIP_STYLE = { background: '#FFFFFF', border: '1px solid #E6E1DA', borderRadius: 8 }
 
 function ChartCard({ title, empty, children }: { title: string; empty: string | null; children: ReactNode }) {
   return (
@@ -152,11 +156,11 @@ function Trends({ logs }: { logs: HealthLog[] }) {
           }
         >
           <LineChart data={weight}>
-            <CartesianGrid stroke="rgba(255,255,255,0.06)" />
+            <CartesianGrid stroke="#E6E1DA" strokeDasharray="0" vertical={false} />
             <XAxis dataKey="date" {...AXIS} />
             <YAxis domain={['auto', 'auto']} {...AXIS} />
             <Tooltip contentStyle={TOOLTIP_STYLE} />
-            <Line type="monotone" dataKey="Weight (kg)" stroke="#20A4F3" strokeWidth={2} isAnimationActive={false} />
+            <Line type="monotone" dataKey="Weight (kg)" stroke="#2F7F86" strokeWidth={2} isAnimationActive={false} />
           </LineChart>
         </ChartCard>
 
@@ -169,11 +173,11 @@ function Trends({ logs }: { logs: HealthLog[] }) {
           }
         >
           <BarChart data={sleep}>
-            <CartesianGrid stroke="rgba(255,255,255,0.06)" />
+            <CartesianGrid stroke="#E6E1DA" strokeDasharray="0" vertical={false} />
             <XAxis dataKey="date" {...AXIS} />
             <YAxis {...AXIS} />
-            <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
-            <Bar dataKey="Sleep (hours)" fill="#20A4F3" radius={[4, 4, 0, 0]} isAnimationActive={false} />
+            <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: 'rgba(47,127,134,0.06)' }} />
+            <Bar dataKey="Sleep (hours)" fill="#5AA9AE" radius={[4, 4, 0, 0]} isAnimationActive={false} />
           </BarChart>
         </ChartCard>
       </div>
@@ -187,13 +191,13 @@ function Trends({ logs }: { logs: HealthLog[] }) {
         }
       >
         <LineChart data={bp}>
-          <CartesianGrid stroke="rgba(255,255,255,0.06)" />
+          <CartesianGrid stroke="#E6E1DA" strokeDasharray="0" vertical={false} />
           <XAxis dataKey="date" {...AXIS} />
           <YAxis domain={['auto', 'auto']} {...AXIS} />
           <Tooltip contentStyle={TOOLTIP_STYLE} />
           <Legend />
-          <Line type="monotone" dataKey="Systolic (High)" stroke="#EF4444" strokeWidth={2} isAnimationActive={false} />
-          <Line type="monotone" dataKey="Diastolic (Low)" stroke="#3B82F6" strokeWidth={2} isAnimationActive={false} />
+          <Line type="monotone" dataKey="Systolic (High)" stroke="#D9776B" strokeWidth={2} isAnimationActive={false} />
+          <Line type="monotone" dataKey="Diastolic (Low)" stroke="#6B8FC4" strokeWidth={2} isAnimationActive={false} />
         </LineChart>
       </ChartCard>
     </>
@@ -207,30 +211,33 @@ export function Goals() {
 
   return (
     <>
-      <h2>🎯 Health Goals</h2>
-      <p className="muted">Track and update your personal health objectives</p>
-      <hr />
-
       <div className="grid-goals">
         {goals.length ? (
           <div className="card">
             <div className="metric-title">Active Goals</div>
             {goals.map((goal, i) => (
               <div key={i} className="goal-row">
-                <span className="goal-icon">{goalIcon(goal)}</span>
+                <span className="goal-icon">
+                  <GoalIcon goal={goal} />
+                </span>
                 <span>{goal}</span>
               </div>
             ))}
           </div>
         ) : (
           <div className="card card-empty">
-            <div className="goal-icon">🎯</div>
-            <div>No health goals set yet. Add your first goal →</div>
+            <div className="goal-icon">
+              <Target className="icon" size={24} aria-hidden="true" />
+            </div>
+            <div>No health goals set yet. Add your first goal using the form.</div>
           </div>
         )}
 
         <details className="card" open={goals.length === 0}>
-          <summary>✏️ Edit Goals</summary>
+          <summary>
+            <Pencil className="icon" size={16} aria-hidden="true" />
+            Edit goals
+          </summary>
           {/* Remount when the saved profile changes so the form shows the stored values. */}
           <GoalsForm
             key={`${profile.health_goals}|${profile.weight_kg}|${profile.fitness_level}`}
@@ -241,22 +248,22 @@ export function Goals() {
       </div>
 
       <hr />
-      <h3>📈 Progress Trends</h3>
+      <h2>Progress Trends</h2>
 
-      {logsQuery.isPending && <p className="caption">📊 Loading health logs...</p>}
+      {logsQuery.isPending && <p className="caption" role="status">Loading health logs...</p>}
       {logsQuery.isError && (
-        <p className="notice notice-error">❌ Error loading health logs: {logsQuery.error.message}</p>
+        <Notice tone="error">Error loading health logs: {logsQuery.error.message}</Notice>
       )}
       {logsQuery.data &&
         (logsQuery.data.length === 0 ? (
-          <div className="notice notice-info">
-            📝 No health logs available yet. Chat with the assistant to start tracking your vitals!
+          <Notice tone="info">
+            No health logs available yet. Chat with the assistant to start tracking your vitals!
             <ul>
               <li>'I weigh 75kg today'</li>
               <li>'I slept 7 hours'</li>
               <li>'My blood pressure is 120/80'</li>
             </ul>
-          </div>
+          </Notice>
         ) : (
           <Trends logs={logsQuery.data} />
         ))}

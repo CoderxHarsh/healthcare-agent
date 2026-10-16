@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import { useAuth } from './auth/AuthContext'
 import { ChatProvider } from './chat/ChatContext'
 import { AppLayout, RequireAuth } from './components/Layout'
+import { Account } from './pages/Account'
 import { Chat } from './pages/Chat'
 import { Dashboard } from './pages/Dashboard'
 import { Landing } from './pages/Landing'
@@ -44,6 +45,7 @@ export function App() {
             />
             <Route path="/wellness" element={<Wellness />} />
             <Route path="/medications" element={<Medications />} />
+            <Route path="/account" element={<Account />} />
           </Route>
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />

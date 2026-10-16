@@ -13,6 +13,7 @@ from sqlalchemy.future import select
 from sqlalchemy.dialects.postgresql import insert
 # ORM models - Database models for users, health logs, medications
 from .models import User, HealthLog, Medication, MedicationLog
+from .security import encrypt_secret
 # SQLAlchemy functions - SQL functions like NOW()
 from sqlalchemy.sql import func
 # datetime - Date and time operations
@@ -36,8 +37,9 @@ async def upsert_user(db: AsyncSession, google_sub: str, email: str, name: str, 
 
     # Only include refresh_token if provided (it's only sent on first consent)
     if refresh_token:
-        values["google_refresh_token"] = refresh_token
-        update_set["google_refresh_token"] = refresh_token
+        # Stored encrypted at rest; google_calendar.refresh_access_token decrypts it.
+        values["google_refresh_token"] = encrypt_secret(refresh_token)
+        update_set["google_refresh_token"] = encrypt_secret(refresh_token)
 
     stmt = insert(User).values(**values).on_conflict_do_update(
         index_elements=["google_sub"],
@@ -49,10 +51,8 @@ async def upsert_user(db: AsyncSession, google_sub: str, email: str, name: str, 
     await db.commit()
 
     # Fetch and return the user
-    print(f"📝 Looking up user with google_sub: {google_sub}")
     result = await db.execute(select(User).where(User.google_sub == google_sub))
     user = result.scalar_one()
-    print(f"✅ Found user: email={user.email}, id={user.id}")
     return user
 
 

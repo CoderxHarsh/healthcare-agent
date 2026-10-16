@@ -14,6 +14,8 @@ from typing import Optional, Dict
 from dotenv import load_dotenv, find_dotenv
 from pathlib import Path
 
+from .security import decrypt_secret
+
 # Load .env from root directory (works from any location)
 env_path = find_dotenv() or Path(__file__).parent.parent / ".env"
 load_dotenv(env_path)
@@ -29,6 +31,9 @@ async def refresh_access_token(refresh_token: str) -> Optional[str]:
     Use the stored refresh_token to get a fresh access_token.
     Returns the access_token or None if refresh fails.
     """
+    refresh_token = decrypt_secret(refresh_token)
+    if not refresh_token:
+        return None
     async with httpx.AsyncClient() as client:
         response = await client.post(
             GOOGLE_TOKEN_ENDPOINT,
@@ -184,3 +189,25 @@ async def delete_medication_reminder(
         else:
             print(f"❌ Calendar event deletion failed: {response.status_code} - {response.text}")
             return False
+
+
+async def revoke_google_token(stored_refresh_token: Optional[str]) -> bool:
+    """
+    Revoke the user's Google grant so HealthAgent can no longer reach their calendar.
+    Best effort: returns True when Google confirms, or when there is nothing to revoke.
+    """
+    token = decrypt_secret(stored_refresh_token)
+    if not token:
+        return True
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                "https://oauth2.googleapis.com/revoke",
+                data={"token": token},
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+                timeout=15,
+            )
+        # 400 means the token was already revoked or expired, which is the state we want.
+        return response.status_code in (200, 400)
+    except Exception:
+        return False
