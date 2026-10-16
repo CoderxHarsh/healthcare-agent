@@ -21,3 +21,4 @@ data_training_guide.md
 
 populate_test_data.py
 test_health_analyzer.py
+node_modules
