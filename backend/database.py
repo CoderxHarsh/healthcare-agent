@@ -29,7 +29,7 @@ if DATABASE_URL and DATABASE_URL.startswith("postgresql://"):
 
 engine = create_async_engine(
     DATABASE_URL,
-    echo=True,
+    echo=os.getenv("SQL_ECHO") == "1",  # Off by default so health data never lands in server logs; set SQL_ECHO=1 locally to debug
     pool_size=5,          # Neon has connection limits on free tier (5 simultaneous connections)
     max_overflow=2,       # Allow up to 2 extra connections beyond pool_size if needed (5+2=7 max)
     pool_timeout=30,      # Wait up to 30s for a connection from the pool

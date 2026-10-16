@@ -42,7 +42,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 # SQLAlchemy select - Building SQL queries
 from sqlalchemy.future import select
 # SQLAlchemy text - Executing raw SQL statements
-from sqlalchemy import text
+from sqlalchemy import text, delete
 
 # CRUD operations - User, health logs, medications, and onboarding functions
 from .crud import (
@@ -55,11 +55,13 @@ from .crud import (
 )
 
 # SQLAlchemy models - User database model
-from .models import User
+from .models import User, Medication, MedicationLog, HealthLog, KnowledgeChunk
 # Health metric parser - Extract health metrics from natural language
 from .data_parser import HealthMetricParser
 # Google Calendar integration - Create/delete medication reminders
-from .google_calendar import create_medication_reminder, delete_medication_reminder
+from .google_calendar import create_medication_reminder, delete_medication_reminder, revoke_google_token
+# Session tokens, per-user access checks, admin/debug guards
+from .security import create_session_token, current_user_id, require_user, require_admin, require_debug
 # PDF Generation - Create health report PDFs
 from .pdf_generator import generate_health_report_pdf, format_report_data
 # Chatbot - Get LLM responses
@@ -69,9 +71,21 @@ from .health_analyzer import get_health_analysis
 
 app = FastAPI()
 
+
+async def require_medication_owner(
+    medication_id: int,
+    uid: int = Depends(current_user_id),
+    db: AsyncSession = Depends(get_db),
+) -> int:
+    """Only the owner of a medication may log or remove it."""
+    med = await get_medication_by_id(db, medication_id)
+    if med is not None and med.user_id != uid:
+        raise HTTPException(status_code=403, detail="You can only access your own data.")
+    return uid
+
 # Configure logging
 logging.basicConfig(
-    level=logging.DEBUG,
+    level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
@@ -79,12 +93,13 @@ logger.info("✅ HealthCareAGENT API started")
 
 # CORS middleware — allow Streamlit Cloud (and localhost) to call this API
 from fastapi.middleware.cors import CORSMiddleware
+load_dotenv(find_dotenv() or Path(__file__).parent.parent / ".env")
+# FRONTEND_URL: public URL(s) of the web app, comma separated (used for CORS and the post-login redirect).
+FRONTEND_URLS = [u.strip().rstrip("/") for u in os.getenv("FRONTEND_URL", "http://localhost:8501").split(",") if u.strip()]
+FRONTEND_URL = FRONTEND_URLS[0]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:8501",
-        "https://healthcare-agent-nuurhq4dt28vzlr5jeypa2.streamlit.app",
-    ],
+    allow_origins=sorted(set(FRONTEND_URLS + ["http://localhost:8501"])),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -147,18 +162,8 @@ async def home():
 
 @app.get("/health")
 async def health_check():
-    """Health check endpoint to verify configuration"""
-    return {
-        "status": "healthy",
-        "api": "running",
-        "google_configured": bool(GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET),
-        "database_url_set": bool(os.getenv("DATABASE_URL")),
-        "environment": {
-            "GOOGLE_CLIENT_ID": GOOGLE_CLIENT_ID[:20] + "..." if GOOGLE_CLIENT_ID else "NOT SET",
-            "GOOGLE_REDIRECT_URI": GOOGLE_REDIRECT_URI,
-            "DATABASE_CONFIGURED": "YES" if "postgresql" in str(os.getenv("DATABASE_URL", "")).lower() else "NO"
-        }
-    }
+    """Liveness check"""
+    return {"status": "healthy"}
 
 
 @app.get("/login")
@@ -168,7 +173,7 @@ def login():
         "client_id": GOOGLE_CLIENT_ID,
         "redirect_uri": GOOGLE_REDIRECT_URI,
         "response_type": "code",
-        "scope": "openid email profile https://www.googleapis.com/auth/calendar",
+        "scope": "openid email profile https://www.googleapis.com/auth/calendar.events",
         "access_type": "offline",
         "prompt": "consent",
     }
@@ -182,10 +187,9 @@ async def auth_callback(request: Request, db: AsyncSession = Depends(get_db)):
     try:
         code = request.query_params.get("code")
         if not code:
-            print("❌ No authorization code found")
+            logger.warning("OAuth callback without an authorization code")
             raise HTTPException(status_code=400, detail="Authorization code not found")
 
-        print(f"📝 Authorization code received: {code[:20]}...")
         
         # Exchange code for access token
         data = {
@@ -202,14 +206,14 @@ async def auth_callback(request: Request, db: AsyncSession = Depends(get_db)):
                 token_response = await client.post(GOOGLE_TOKEN_ENDPOINT, data=data, timeout=30)
                 
                 if token_response.status_code != 200:
-                    print(f"❌ Token error: {token_response.status_code} - {token_response.text}")
-                    raise HTTPException(status_code=400, detail=f"Token exchange failed: {token_response.text}")
+                    logger.error("Google token exchange failed with status %s", token_response.status_code)
+                    raise HTTPException(status_code=400, detail="Google sign-in failed. Please try again.")
                 
                 token_data = token_response.json()
                 access_token = token_data.get("access_token")
 
                 if not access_token:
-                    print(f"❌ No access token in response: {token_data}")
+                    logger.error("Google token response had no access token")
                     raise HTTPException(status_code=400, detail="Failed to retrieve access token")
 
                 print("✅ Token received")
@@ -220,26 +224,21 @@ async def auth_callback(request: Request, db: AsyncSession = Depends(get_db)):
                 userinfo_response = await client.get(GOOGLE_USERINFO_ENDPOINT, headers=headers, timeout=30)
                 
                 if userinfo_response.status_code != 200:
-                    print(f"❌ Userinfo error: {userinfo_response.status_code} - {userinfo_response.text}")
+                    logger.error("Google userinfo request failed with status %s", userinfo_response.status_code)
                     raise HTTPException(status_code=400, detail="Failed to get user info")
                 
                 userinfo = userinfo_response.json()
-                print(f"✅ User info from Google: {userinfo}")
+                logger.info("Fetched Google profile for sign-in")
         except HTTPException:
             raise
         except Exception as e:
-            print(f"❌ HTTP request error: {str(e)}")
-            raise HTTPException(status_code=500, detail=f"Failed to communicate with Google: {str(e)}")
+            logger.error("Google request error: %s", type(e).__name__)
+            raise HTTPException(status_code=500, detail="Failed to communicate with Google. Please try again.")
 
         # Save user to database (including refresh_token for Calendar API)
         try:
             refresh_token = token_data.get("refresh_token")
-            if refresh_token:
-                print(f"🔑 Refresh token received — will store for Calendar API")
-            else:
-                print(f"⚠️ No refresh token (user may have already granted access)")
 
-            print(f"💾 Saving user to database...")
             user = await upsert_user(
                 db,
                 google_sub=userinfo.get("id"),
@@ -248,47 +247,22 @@ async def auth_callback(request: Request, db: AsyncSession = Depends(get_db)):
                 picture=userinfo.get("picture"),
                 refresh_token=refresh_token,
             )
-            print(f"✅ User saved: {user.email} (ID: {user.id})")
+            logger.info("User signed in (id=%s)", user.id)
         except Exception as e:
-            print(f"❌ Database error: {str(e)}")
-            raise HTTPException(status_code=500, detail=f"Failed to save user to database: {str(e)}")
+            logger.error("Database error while saving user: %s", type(e).__name__)
+            raise HTTPException(status_code=500, detail="Failed to save your account. Please try again.")
 
         # Redirect based on onboarding status
-        encoded_name = urllib.parse.quote(user.name or "User")
-        if not user.is_onboarded:
-            redirect_url = f"http://localhost:8501/?user={encoded_name}&user_id={user.id}&onboarded=false"
-        else:
-            redirect_url = f"http://localhost:8501/?user={encoded_name}&user_id={user.id}&onboarded=true"
-        
-        print(f"🔗 Redirecting to: {redirect_url}")
+        # The signed session token proves this browser completed Google sign-in; the web app sends it on every call.
+        token = urllib.parse.quote(create_session_token(user.id))
+        redirect_url = f"{FRONTEND_URL}/?user_id={user.id}&token={token}"
         return RedirectResponse(url=redirect_url)
         
     except HTTPException:
         raise
     except Exception as e:
-        print(f"❌ Unexpected error in auth_callback: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
-
-
-@app.get("/profile", response_class=HTMLResponse)
-async def profile(request: Request):
-    """Display user's profile information from Google OAuth"""
-    name = request.query_params.get("name")
-    email = request.query_params.get("email")
-    picture = request.query_params.get("picture")
-
-    return f"""
-    <html>
-        <head><title>User Profile</title></head>
-        <body style='text-align:center; font-family:sans-serif;'>
-            <h1>Welcome, {name}!</h1>
-            <img src="{picture}" alt="Profile Picture" width="120"/><br>
-            <p>Email: {email}</p>
-        </body>
-    </html>
-    """
+        logger.exception("Unexpected error in auth_callback")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 # ============================================
@@ -305,7 +279,9 @@ class GoogleLoginData(BaseModel):
 
 @app.post("/auth/google-login")
 async def google_login(data: GoogleLoginData, db: AsyncSession = Depends(get_db)):
-    """Accept user info from Streamlit OAuth flow and upsert into the database"""
+    """Legacy Streamlit login. Disabled unless ENABLE_LEGACY_STREAMLIT_LOGIN=1 because it trusts client-supplied identity."""
+    if os.getenv("ENABLE_LEGACY_STREAMLIT_LOGIN") != "1":
+        raise HTTPException(status_code=404, detail="Not found.")
     try:
         user = await upsert_user(
             db,
@@ -356,7 +332,8 @@ class HealthLogResponse(BaseModel):
 async def log_health_metric(
     user_id: int,
     log_data: HealthLogCreate,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _uid: int = Depends(require_user)
 ):
     """Create a new health log entry"""
     try:
@@ -382,7 +359,8 @@ async def log_health_metric(
 async def log_from_text(
     user_id: int,
     request_body: dict,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _uid: int = Depends(require_user)
 ):
     """Parse and log health metrics from natural language text"""
     text = request_body.get("text", "")
@@ -426,7 +404,8 @@ async def log_from_text(
 async def upload_health_logs(
     user_id: int,
     file: UploadFile = File(...),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _uid: int = Depends(require_user)
 ):
     """Upload health logs via CSV, JSON, or XML"""
     contents = await file.read()
@@ -505,7 +484,8 @@ async def get_logs(
     user_id: int,
     metric_type: str = None,
     days: int = 30,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _uid: int = Depends(require_user)
 ):
     """Get user's health logs"""
     try:
@@ -534,7 +514,8 @@ async def get_logs(
 async def get_latest_log(
     user_id: int,
     metric_type: str,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _uid: int = Depends(require_user)
 ):
     """Get the latest health log for a specific metric type"""
     try:
@@ -565,7 +546,8 @@ async def get_latest_log(
 async def get_summary(
     user_id: int,
     days: int = 30,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _uid: int = Depends(require_user)
 ):
     """Get a summary of all health metrics for the user"""
     try:
@@ -598,15 +580,16 @@ class OnboardingData(BaseModel):
 
 @app.get("/onboarding")
 async def onboarding_page():
-    """Redirect to Streamlit onboarding page"""
-    return RedirectResponse(url="http://localhost:8501/?page=onboarding")
+    """Redirect to the web app's onboarding page"""
+    return RedirectResponse(url=f"{FRONTEND_URL}/onboarding")
 
 
 @app.post("/user/{user_id}/onboarding")
 async def save_onboarding(
     user_id: int,
     data: OnboardingData,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _uid: int = Depends(require_user)
 ):
     """Save user's onboarding health profile"""
     print(f"💾 Saving onboarding data for user_id: {user_id} (type: {type(user_id)})")
@@ -643,7 +626,8 @@ async def save_onboarding(
 @app.post("/user/{user_id}/complete-onboarding")
 async def complete_user_onboarding(
     user_id: int,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _uid: int = Depends(require_user)
 ):
     """Mark user as onboarded and redirect to dashboard"""
     try:
@@ -662,7 +646,8 @@ async def complete_user_onboarding(
 @app.get("/user/{user_id}/profile")
 async def get_user_profile_endpoint(
     user_id: int,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _uid: int = Depends(require_user)
 ):
     """Get user's complete profile including onboarding info"""
     try:
@@ -710,7 +695,8 @@ class GoalsUpdate(BaseModel):
 async def update_user_goals(
     user_id: int,
     data: GoalsUpdate,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _uid: int = Depends(require_user)
 ):
     """Update user's health goals, target weight, and fitness level"""
     try:
@@ -758,7 +744,8 @@ class MedicationLogCreate(BaseModel):
 async def add_medication(
     user_id: int,
     data: MedicationCreate,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _uid: int = Depends(require_user)
 ):
     """Add a new medication and create a Google Calendar reminder"""
     try:
@@ -809,7 +796,8 @@ async def add_medication(
 async def list_medications(
     user_id: int,
     active_only: bool = True,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _uid: int = Depends(require_user)
 ):
     """Get all medications for a user"""
     try:
@@ -841,7 +829,8 @@ async def list_medications(
 async def log_medication(
     medication_id: int,
     data: MedicationLogCreate,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _uid: int = Depends(require_medication_owner)
 ):
     """Log whether a medication was taken or skipped"""
     try:
@@ -875,7 +864,8 @@ async def log_medication(
 @app.delete("/medications/{medication_id}")
 async def remove_medication(
     medication_id: int,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _uid: int = Depends(require_medication_owner)
 ):
     """Deactivate a medication and remove its Google Calendar event"""
     try:
@@ -906,7 +896,8 @@ async def remove_medication(
 async def medication_adherence(
     user_id: int,
     days: int = 30,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _uid: int = Depends(require_user)
 ):
     """Get medication adherence statistics"""
     try:
@@ -930,7 +921,8 @@ import tempfile
 async def export_health_report(
     user_id: int,
     days: int = 30,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _uid: int = Depends(require_user)
 ):
     """Generate and download a PDF health report"""
     try:
@@ -1032,8 +1024,80 @@ async def export_health_report(
 # CHATBOT & AI ENDPOINTS
 # ============================================
 
+# ============================================
+# ACCOUNT & DATA CONTROLS - Calendar disconnect and account deletion
+# ============================================
+
+async def _remove_calendar_reminders(db: AsyncSession, user: User) -> None:
+    """Best effort: delete the reminder events HealthAgent created in the user's Google Calendar."""
+    if not user.google_refresh_token:
+        return
+    meds = await get_user_medications(db, user.id, active_only=False)
+    for med in meds:
+        if med.gcal_event_id:
+            try:
+                await delete_medication_reminder(user.google_refresh_token, med.gcal_event_id)
+            except Exception:
+                logger.warning("Could not delete a calendar reminder during cleanup")
+
+
+@app.post("/user/{user_id}/disconnect-calendar")
+async def disconnect_calendar(
+    user_id: int,
+    db: AsyncSession = Depends(get_db),
+    _uid: int = Depends(require_user),
+):
+    """Delete HealthAgent's calendar reminders, revoke Google access, and forget the stored token."""
+    user = await get_user_profile(db, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    await _remove_calendar_reminders(db, user)
+    revoked = await revoke_google_token(user.google_refresh_token)
+
+    user.google_refresh_token = None
+    await db.execute(
+        text("UPDATE medications SET gcal_event_id = NULL WHERE user_id = :uid"),
+        {"uid": user_id},
+    )
+    await db.commit()
+    return {"status": "success", "google_access_revoked": revoked}
+
+
+@app.delete("/user/{user_id}")
+async def delete_account(
+    user_id: int,
+    db: AsyncSession = Depends(get_db),
+    _uid: int = Depends(require_user),
+):
+    """Permanently delete the account and every record tied to it."""
+    user = await get_user_profile(db, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    await _remove_calendar_reminders(db, user)
+    await revoke_google_token(user.google_refresh_token)
+
+    try:
+        await db.execute(delete(MedicationLog).where(MedicationLog.user_id == user_id))
+        await db.execute(delete(Medication).where(Medication.user_id == user_id))
+        await db.execute(delete(HealthLog).where(HealthLog.user_id == user_id))
+        await db.execute(delete(KnowledgeChunk).where(KnowledgeChunk.user_id == user_id))
+        await db.execute(delete(User).where(User.id == user_id))
+        await db.commit()
+    except Exception:
+        await db.rollback()
+        logger.exception("Account deletion failed (user id=%s)", user_id)
+        raise HTTPException(status_code=500, detail="Could not delete the account. Please try again.")
+
+    logger.info("Account deleted (id=%s)", user_id)
+    return {"status": "success", "message": "Your account and data have been deleted."}
+
+
 @app.get("/user/{user_id}/vitals-summary")
-async def get_vitals_summary(user_id: int, db: AsyncSession = Depends(get_db)):
+async def get_vitals_summary(user_id: int, db: AsyncSession = Depends(get_db),
+    _uid: int = Depends(require_user)
+):
     """Generate a personalized AI analysis of the user's health using ML model."""
     logger.info(f"📋 GET /user/{user_id}/vitals-summary - Starting analysis")
     
@@ -1102,7 +1166,9 @@ async def get_vitals_summary(user_id: int, db: AsyncSession = Depends(get_db)):
         }
 
 @app.get("/debug/user/{user_id}/logs")
-async def debug_user_logs(user_id: int, db: AsyncSession = Depends(get_db)):
+async def debug_user_logs(user_id: int, db: AsyncSession = Depends(get_db),
+    _debug: None = Depends(require_debug)
+):
     """
     DEBUG ENDPOINT: Show ALL health logs for a user with NO date filtering.
     Use this to verify data exists in the DB regardless of timezone issues.
@@ -1133,7 +1199,9 @@ async def debug_user_logs(user_id: int, db: AsyncSession = Depends(get_db)):
 
 
 @app.get("/debug/llm-test")
-async def debug_llm_test():
+async def debug_llm_test(
+    _debug: None = Depends(require_debug)
+):
     """
     DEBUG ENDPOINT: Test if LLM is working
     Returns detailed diagnostic information
@@ -1302,7 +1370,9 @@ import shutil
 
 
 @app.post("/rag/ingest")
-async def rag_ingest(force: bool = False):
+async def rag_ingest(force: bool = False,
+    _admin: None = Depends(require_admin)
+):
     """
     Ingest all documents in data/documents/ into the vector store.
     Set force=true to re-index files that are already indexed.
@@ -1320,7 +1390,9 @@ async def rag_ingest(force: bool = False):
 
 
 @app.post("/rag/upload/{user_id}")
-async def rag_upload(user_id: int, file: UploadFile = FastAPIFile(...), force: bool = False):
+async def rag_upload(user_id: int, file: UploadFile = FastAPIFile(...), force: bool = False,
+    _uid: int = Depends(require_user)
+):
     """
     Upload a document (PDF/TXT/MD) and immediately ingest it into the vector store.
     """
@@ -1329,7 +1401,9 @@ async def rag_upload(user_id: int, file: UploadFile = FastAPIFile(...), force: b
     if suffix not in allowed:
         raise HTTPException(status_code=400, detail=f"Unsupported file type '{suffix}'. Allowed: {allowed}")
 
-    dest = DOCUMENTS_DIR / file.filename
+    import uuid
+    safe_name = Path(file.filename).name
+    dest = DOCUMENTS_DIR / f"{uuid.uuid4().hex[:8]}_{safe_name}"
     try:
         with dest.open("wb") as f:
             shutil.copyfileobj(file.file, f)
@@ -1343,7 +1417,7 @@ async def rag_upload(user_id: int, file: UploadFile = FastAPIFile(...), force: b
         stats = get_collection_stats()
         return {
             "status": "success",
-            "file": file.filename,
+            "file": safe_name,
             "chunks_indexed": count,
             "total_chunks": stats["total_chunks"],
         }
@@ -1352,7 +1426,9 @@ async def rag_upload(user_id: int, file: UploadFile = FastAPIFile(...), force: b
 
 
 @app.get("/rag/stats")
-async def rag_stats():
+async def rag_stats(
+    _admin: None = Depends(require_admin)
+):
     """Return current vector store statistics."""
     try:
         stats = get_collection_stats()
@@ -1368,7 +1444,9 @@ async def rag_stats():
 
 
 @app.delete("/rag/delete/{filename}")
-async def rag_delete(filename: str):
+async def rag_delete(filename: str,
+    _admin: None = Depends(require_admin)
+):
     """Remove all chunks belonging to a specific document from the vector store."""
     try:
         removed = delete_chunks_by_source(filename)
