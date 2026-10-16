@@ -65,7 +65,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
             for (const metric of metrics) {
               await api.createHealthLog(userId, { ...metric, source: 'chatbot' })
             }
-            reply += `\n\n📊 **Metrics saved:** ${metrics.map((m) => m.metric_type).join(', ')}`
+            reply += `\n\n**Metrics saved:** ${metrics.map((m) => m.metric_type).join(', ')}`
             void queryClient.invalidateQueries({ queryKey: ['health-logs', userId] })
             void queryClient.invalidateQueries({ queryKey: ['vitals-summary', userId] })
           }

@@ -2,8 +2,11 @@ import requests
 import xml.etree.ElementTree as ET
 
 def fetch_medline_data(query: str):
-    url = f"https://wsearch.nlm.nih.gov/ws/query?db=healthTopics&term={query}"
-    response = requests.get(url)
+    response = requests.get(
+        "https://wsearch.nlm.nih.gov/ws/query",
+        params={"db": "healthTopics", "term": query},
+        timeout=10,
+    )
     return response.text
 
 

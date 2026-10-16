@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { ApiError } from '../api/client'
+import { ApiError, getSessionToken, onUnauthorized, setSessionToken } from '../api/client'
 import { profileQuery } from '../api/queries'
 import type { Profile } from '../api/types'
 
@@ -38,18 +38,21 @@ function writeStored(id: number | null) {
 }
 
 /**
- * The backend's /auth/callback redirects here with ?user=..&user_id=..&onboarded=..
- * Take the id from the URL once, remember it, and clean the address bar.
+ * The backend's /auth/callback redirects here with ?user_id=..&token=..
+ * Take both from the URL once, remember them, and clean the address bar.
  */
 function initialUserId(): number | null {
   const params = new URLSearchParams(window.location.search)
   const fromUrl = Number(params.get('user_id'))
-  if (Number.isInteger(fromUrl) && fromUrl > 0) {
+  const tokenFromUrl = params.get('token')
+  if (Number.isInteger(fromUrl) && fromUrl > 0 && tokenFromUrl) {
     writeStored(fromUrl)
+    setSessionToken(tokenFromUrl)
     window.history.replaceState(null, '', window.location.pathname)
     return fromUrl
   }
-  return readStored()
+  // A remembered id without a session token (an old session) can't call the API: start as a guest.
+  return getSessionToken() ? readStored() : null
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -64,9 +67,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(() => {
     writeStored(null)
+    setSessionToken(null)
     setUserId(null)
     queryClient.clear()
   }, [queryClient])
+
+  // An expired or rejected session token signs the user out.
+  useEffect(() => {
+    onUnauthorized(logout)
+    return () => onUnauthorized(null)
+  }, [logout])
 
   // A stored id that no longer exists on the backend is a dead session.
   const notFound = query.error instanceof ApiError && query.error.status === 404

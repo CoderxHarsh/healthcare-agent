@@ -1,8 +1,11 @@
 import { useState, type FormEvent } from 'react'
-import { Navigate, useNavigate } from 'react-router-dom'
+import { Link, Navigate, useNavigate } from 'react-router-dom'
+import { Check, Lock } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { api } from '../api/client'
 import { useUser } from '../auth/AuthContext'
+import { BrandMark, Notice } from '../components/ui'
+import { APP_NAME, MIN_AGE } from '../config'
 import { errorMessage } from '../components/Toast'
 
 const GENDERS = ['Male', 'Female', 'Other', 'Prefer not to say']
@@ -52,6 +55,7 @@ function CheckboxGroup({
               onChange(e.target.checked ? [...selected, option] : selected.filter((s) => s !== option))
             }
           />
+          <Check className="icon check" size={16} aria-hidden="true" />
           {option}
         </label>
       ))}
@@ -75,6 +79,7 @@ export function Onboarding() {
   const [goals, setGoals] = useState<string[]>([])
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [agreed, setAgreed] = useState(false)
 
   if (profile.is_onboarded) return <Navigate to="/chat" replace />
 
@@ -83,8 +88,17 @@ export function Onboarding() {
     const ageNum = Number(age)
     const heightNum = Number(height)
     const weightNum = Number(weight)
+    if (ageNum && ageNum < MIN_AGE) {
+      setError(`${APP_NAME} is for adults aged ${MIN_AGE} or older.`)
+      return
+    }
     if (!ageNum || !heightNum || !weightNum) {
       setError('Please fill in all required fields (Age, Gender, Height, Weight, Fitness Level)')
+      return
+    }
+
+    if (!agreed) {
+      setError('Please confirm that you agree to the Terms of Service and Privacy Policy to continue.')
       return
     }
 
@@ -113,84 +127,109 @@ export function Onboarding() {
 
   return (
     <div className="page-narrow">
-      <h1>🎯 Complete Your Health Profile</h1>
-      <hr />
-      <h3>Help us know you better!</h3>
-      <p className="muted">
-        This information helps us provide personalized health advice and recommendations.
+      <div className="row" style={{ justifyContent: 'center', marginBottom: 20 }}>
+        <BrandMark />
+        <strong style={{ color: 'var(--text)', fontSize: '1.125rem' }}>{APP_NAME}</strong>
+      </div>
+      <h1 style={{ textAlign: 'center' }}>Complete your health profile</h1>
+      <p className="muted" style={{ textAlign: 'center' }}>
+        Help us know you better. This information helps us personalize your health guidance.
       </p>
 
-      <form className="card form" onSubmit={handleSubmit}>
-        <div className="grid-2">
+      <form className="card form" onSubmit={handleSubmit} noValidate>
+        <section className="form-section" aria-labelledby="sec-about">
+          <h2 id="sec-about">About you</h2>
+          <div className="grid-2">
+            <label className="field">
+              Age (required)
+              <input type="number" min={18} max={120} value={age} onChange={(e) => setAge(e.target.value)} />
+            </label>
+            <label className="field">
+              Gender (required)
+              <select value={gender} onChange={(e) => setGender(e.target.value)}>
+                {GENDERS.map((g) => (
+                  <option key={g}>{g}</option>
+                ))}
+              </select>
+            </label>
+            <label className="field">
+              Height in cm (required)
+              <input type="number" min={50} max={250} value={height} onChange={(e) => setHeight(e.target.value)} />
+            </label>
+            <label className="field">
+              Weight in kg (required)
+              <input
+                type="number"
+                min={20}
+                max={300}
+                step="0.1"
+                value={weight}
+                onChange={(e) => setWeight(e.target.value)}
+              />
+            </label>
+          </div>
+        </section>
+
+        <section className="form-section" aria-labelledby="sec-background">
+          <h2 id="sec-background">Health background</h2>
+          <CheckboxGroup
+            legend="Existing conditions (optional, select all that apply)"
+            options={CONDITIONS}
+            selected={conditions}
+            onChange={setConditions}
+          />
           <label className="field">
-            Age *
-            <input type="number" min={1} max={120} value={age} onChange={(e) => setAge(e.target.value)} />
+            Current medications (optional)
+            <textarea
+              value={medications}
+              onChange={(e) => setMedications(e.target.value)}
+              placeholder="List your medications, e.g., Aspirin, Metformin, etc."
+            />
           </label>
           <label className="field">
-            Gender *
-            <select value={gender} onChange={(e) => setGender(e.target.value)}>
-              {GENDERS.map((g) => (
-                <option key={g}>{g}</option>
+            Allergies (optional)
+            <textarea
+              value={allergies}
+              onChange={(e) => setAllergies(e.target.value)}
+              placeholder="List any known allergies, medications or food"
+            />
+          </label>
+        </section>
+
+        <section className="form-section" aria-labelledby="sec-goals">
+          <h2 id="sec-goals">Lifestyle and goals</h2>
+          <label className="field">
+            Fitness level (required)
+            <select value={fitness} onChange={(e) => setFitness(e.target.value)}>
+              {FITNESS_LEVELS.map((f) => (
+                <option key={f}>{f}</option>
               ))}
             </select>
           </label>
-          <label className="field">
-            Height (cm) *
-            <input type="number" min={50} max={250} value={height} onChange={(e) => setHeight(e.target.value)} />
+          <CheckboxGroup legend="Health goals (optional)" options={GOALS} selected={goals} onChange={setGoals} />
+        </section>
+
+        <section className="form-section" aria-labelledby="sec-consent">
+          <h2 id="sec-consent">Your privacy</h2>
+          <p className="privacy-note">
+            <Lock className="icon" size={16} aria-hidden="true" />
+            Your information is private and used only to personalize your experience.
+          </p>
+          <label className="checkbox" style={{ alignItems: 'flex-start', borderRadius: 12, padding: '12px 16px' }}>
+            <input type="checkbox" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} />
+            <Check className="icon check" size={16} aria-hidden="true" style={{ marginTop: 3 }} />
+            <span>
+              I am 18 or older and I agree to the <Link to="/terms" target="_blank">Terms of Service</Link> and{' '}
+              <Link to="/privacy" target="_blank">Privacy Policy</Link>. I understand that the health information I enter
+              is processed by AI services to answer my questions.
+            </span>
           </label>
-          <label className="field">
-            Weight (kg) *
-            <input
-              type="number"
-              min={20}
-              max={300}
-              step="0.1"
-              value={weight}
-              onChange={(e) => setWeight(e.target.value)}
-            />
-          </label>
-        </div>
+        </section>
 
-        <CheckboxGroup
-          legend="Health Conditions (select all that apply)"
-          options={CONDITIONS}
-          selected={conditions}
-          onChange={setConditions}
-        />
-
-        <label className="field">
-          Current Medications (if any)
-          <textarea
-            value={medications}
-            onChange={(e) => setMedications(e.target.value)}
-            placeholder="List your medications, e.g., Aspirin, Metformin, etc."
-          />
-        </label>
-
-        <label className="field">
-          Allergies (if any)
-          <textarea
-            value={allergies}
-            onChange={(e) => setAllergies(e.target.value)}
-            placeholder="List any known allergies, medications or food"
-          />
-        </label>
-
-        <label className="field">
-          Current Fitness Level *
-          <select value={fitness} onChange={(e) => setFitness(e.target.value)}>
-            {FITNESS_LEVELS.map((f) => (
-              <option key={f}>{f}</option>
-            ))}
-          </select>
-        </label>
-
-        <CheckboxGroup legend="Health Goals" options={GOALS} selected={goals} onChange={setGoals} />
-
-        {error && <p className="notice notice-error">❌ {error}</p>}
+        {error && <Notice tone="error">{error}</Notice>}
 
         <button type="submit" className="btn btn-primary btn-block" disabled={saving}>
-          {saving ? 'Saving...' : '✅ Complete Onboarding'}
+          {saving ? 'Saving...' : 'Save and continue'}
         </button>
       </form>
     </div>

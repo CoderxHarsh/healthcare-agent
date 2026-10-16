@@ -4,6 +4,7 @@ import { api } from '../api/client'
 import { healthLogsQuery, healthSummaryQuery } from '../api/queries'
 import { useUser } from '../auth/AuthContext'
 import { Tabs } from '../components/Tabs'
+import { Notice } from '../components/ui'
 import { errorMessage, useToast } from '../components/Toast'
 import { formatDateTime, titleCase } from '../lib/metrics'
 
@@ -36,7 +37,7 @@ function LogsTab({ userId }: { userId: number }) {
 
   return (
     <>
-      <h3>Health Metrics History</h3>
+      <h2>Health metrics history</h2>
       <div className="grid-2">
         <label className="field">
           Filter by Metric
@@ -50,13 +51,13 @@ function LogsTab({ userId }: { userId: number }) {
       </div>
 
       {query.isPending && <p className="caption">Loading...</p>}
-      {query.isError && <p className="notice notice-error">❌ Error fetching logs: {query.error.message}</p>}
+      {query.isError && <Notice tone="error">Error fetching logs: {query.error.message}</Notice>}
       {query.data &&
         (query.data.length === 0 ? (
-          <p className="notice notice-info">📭 No metrics logged yet. Add one in the "Add Metric" tab!</p>
+          <Notice tone="info">No metrics logged yet. Add one in the "Add Metric" tab!</Notice>
         ) : (
           <div className="table-wrap">
-            <table>
+            <table className="table-stack">
               <thead>
                 <tr>
                   <th>Date</th>
@@ -95,7 +96,7 @@ function AddMetricTab({ userId }: { userId: number }) {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     if (!value.trim()) {
-      notify('error', '❌ Please enter a value')
+      notify('error', 'Please enter a value')
       return
     }
     setSaving(true)
@@ -111,9 +112,9 @@ function AddMetricTab({ userId }: { userId: number }) {
       void queryClient.invalidateQueries({ queryKey: ['vitals-summary', userId] })
       setValue('')
       setNotes('')
-      notify('success', '✅ Metric saved successfully!')
+      notify('success', 'Metric saved successfully!')
     } catch (err) {
-      notify('error', `❌ ${errorMessage(err)}`)
+      notify('error', `${errorMessage(err)}`)
     } finally {
       setSaving(false)
     }
@@ -121,7 +122,7 @@ function AddMetricTab({ userId }: { userId: number }) {
 
   return (
     <form className="form" onSubmit={handleSubmit}>
-      <h3>Add Health Metric</h3>
+      <h2>Add health metric</h2>
       <div className="grid-2">
         <label className="field">
           Metric Type
@@ -143,7 +144,7 @@ function AddMetricTab({ userId }: { userId: number }) {
         <textarea value={notes} onChange={(e) => setNotes(e.target.value)} />
       </label>
       <button type="submit" className="btn btn-primary btn-block" disabled={saving}>
-        {saving ? 'Saving...' : '💾 Save Metric'}
+        {saving ? 'Saving...' : 'Save Metric'}
       </button>
     </form>
   )
@@ -156,18 +157,18 @@ function SummaryTab({ userId }: { userId: number }) {
 
   return (
     <>
-      <h3>Health Summary</h3>
+      <h2>Health summary</h2>
       <DaysSlider label="Summary period (days)" value={days} onChange={setDays} />
 
       {query.isPending && <p className="caption">Loading...</p>}
-      {query.isError && <p className="notice notice-error">❌ Error: {query.error.message}</p>}
+      {query.isError && <Notice tone="error">Error: {query.error.message}</Notice>}
       {query.data && groups.length === 0 && (
-        <p className="notice notice-info">📭 No metrics logged yet in this period.</p>
+        <Notice tone="info">No metrics logged yet in this period.</Notice>
       )}
       {groups.map(([metricType, entries]) => (
         <details key={metricType} className="card">
           <summary>
-            📊 {titleCase(metricType)} ({entries.length} entries)
+            {titleCase(metricType)} ({entries.length} entries)
           </summary>
           {entries.slice(0, 5).map((entry, i) => (
             <div key={i} className="summary-row">
@@ -199,7 +200,7 @@ function BulkImportTab({ userId }: { userId: number }) {
       void queryClient.invalidateQueries({ queryKey: ['health-logs', userId] })
       void queryClient.invalidateQueries({ queryKey: ['vitals-summary', userId] })
     } catch (err) {
-      notify('error', `❌ ${errorMessage(err)}`)
+      notify('error', `${errorMessage(err)}`)
     } finally {
       setBusy(false)
     }
@@ -207,19 +208,19 @@ function BulkImportTab({ userId }: { userId: number }) {
 
   return (
     <div className="form">
-      <h3>📥 Bulk Import Health Logs</h3>
+      <h2>Bulk import health logs</h2>
       <p>Upload a CSV, JSON, or XML file containing your historical health logs.</p>
-      <p className="notice notice-info">
+      <Notice tone="info">
         Expected columns/keys: <code>metric_type</code>, <code>value</code>, <code>unit</code> (optional),{' '}
         <code>date</code> (optional).
-      </p>
+      </Notice>
       <label className="field">
         Upload file
         <input type="file" accept=".csv,.json,.xml" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
       </label>
       {file && (
         <button type="button" className="btn btn-primary btn-block" onClick={handleImport} disabled={busy}>
-          {busy ? 'Processing file...' : '🚀 Process Import'}
+          {busy ? 'Processing file...' : 'Process Import'}
         </button>
       )}
     </div>
@@ -231,13 +232,12 @@ export function Wellness() {
 
   return (
     <>
-      <h2>📊 Your Wellness Tracker</h2>
       <Tabs
         tabs={[
-          { id: 'logs', label: '📈 View Logs', content: <LogsTab userId={userId} /> },
-          { id: 'add', label: '➕ Add Metric', content: <AddMetricTab userId={userId} /> },
-          { id: 'summary', label: '📋 Summary', content: <SummaryTab userId={userId} /> },
-          { id: 'import', label: '📥 Bulk Import', content: <BulkImportTab userId={userId} /> },
+          { id: 'logs', label: 'View Logs', content: <LogsTab userId={userId} /> },
+          { id: 'add', label: 'Add Metric', content: <AddMetricTab userId={userId} /> },
+          { id: 'summary', label: 'Summary', content: <SummaryTab userId={userId} /> },
+          { id: 'import', label: 'Bulk Import', content: <BulkImportTab userId={userId} /> },
         ]}
       />
     </>

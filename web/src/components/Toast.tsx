@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useRef, useState, type ReactNode } from 'react'
+import { ToneIcon } from './ui'
 
 type ToastKind = 'success' | 'warning' | 'error' | 'info'
 
@@ -19,7 +20,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const notify = useCallback<Notify>((kind, text) => {
     const id = nextId.current++
     setToasts((current) => [...current, { id, kind, text }])
-    setTimeout(() => setToasts((current) => current.filter((t) => t.id !== id)), 5000)
+    setTimeout(() => setToasts((current) => current.filter((t) => t.id !== id)), kind === 'error' ? 10_000 : 5000)
   }, [])
 
   return (
@@ -27,8 +28,9 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       {children}
       <div className="toasts" role="status" aria-live="polite">
         {toasts.map((t) => (
-          <div key={t.id} className={`toast toast-${t.kind}`}>
-            {t.text}
+          <div key={t.id} className={`toast toast-${t.kind}`} role={t.kind === 'error' ? 'alert' : undefined}>
+            <ToneIcon tone={t.kind} />
+            <span>{t.text}</span>
           </div>
         ))}
       </div>

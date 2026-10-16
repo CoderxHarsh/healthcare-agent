@@ -17,6 +17,33 @@ import type {
 
 export const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000').replace(/\/+$/, '')
 
+const TOKEN_KEY = 'healthagent.token'
+
+/** Signed session token issued by the backend after Google sign-in; sent with every request. */
+export function getSessionToken(): string | null {
+  try {
+    return localStorage.getItem(TOKEN_KEY)
+  } catch {
+    return null
+  }
+}
+
+export function setSessionToken(token: string | null) {
+  try {
+    if (token) localStorage.setItem(TOKEN_KEY, token)
+    else localStorage.removeItem(TOKEN_KEY)
+  } catch {
+    // Storage unavailable (private mode): the session just won't survive a refresh.
+  }
+}
+
+let unauthorizedHandler: (() => void) | null = null
+
+/** Called when the backend rejects the session token (expired or invalid) so the app can sign out. */
+export function onUnauthorized(handler: (() => void) | null) {
+  unauthorizedHandler = handler
+}
+
 /** status is 0 when the request never got a response (network failure or timeout). */
 export class ApiError extends Error {
   status: number
@@ -64,11 +91,16 @@ async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), timeoutMs)
 
+  const headers: Record<string, string> = {}
+  if (json !== undefined) headers['Content-Type'] = 'application/json'
+  const token = getSessionToken()
+  if (token) headers.Authorization = `Bearer ${token}`
+
   let res: Response
   try {
     res = await fetch(url, {
       method,
-      headers: json !== undefined ? { 'Content-Type': 'application/json' } : undefined,
+      headers,
       body: json !== undefined ? JSON.stringify(json) : form,
       signal: controller.signal,
     })
@@ -84,6 +116,7 @@ async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
   }
 
   const body: unknown = await res.json().catch(() => null)
+  if (res.status === 401 && token) unauthorizedHandler?.()
   if (!res.ok) {
     throw new ApiError(res.status, detailMessage(body) ?? `Request failed (status ${res.status})`)
   }
@@ -100,7 +133,22 @@ export const api = {
   /** Backend route that starts the Google OAuth flow and redirects back with ?user_id=... */
   loginUrl: `${API_BASE_URL}/login`,
 
-  healthReportUrl: (userId: number) => `${API_BASE_URL}/export/health-report/${userId}`,
+  /** The report needs the session token, so fetch it and hand the browser a PDF to save. */
+  downloadHealthReport: async (userId: number) => {
+    const token = getSessionToken()
+    const res = await fetch(`${API_BASE_URL}/export/health-report/${userId}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    })
+    if (!res.ok) throw new ApiError(res.status, 'Could not generate the report. Please try again.')
+    const url = URL.createObjectURL(await res.blob())
+    const link = document.createElement('a')
+    link.href = url
+    link.download = 'health-report.pdf'
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    setTimeout(() => URL.revokeObjectURL(url), 10_000)
+  },
 
   // ── User ──
   getProfile: (userId: number) =>
@@ -117,6 +165,15 @@ export const api = {
 
   getVitalsSummary: (userId: number) =>
     request<VitalsSummary>(`/user/${userId}/vitals-summary`, { timeoutMs: 45_000 }),
+
+  disconnectCalendar: (userId: number) =>
+    request<{ google_access_revoked: boolean }>(`/user/${userId}/disconnect-calendar`, {
+      method: 'POST',
+      timeoutMs: 30_000,
+    }),
+
+  deleteAccount: (userId: number) =>
+    request<unknown>(`/user/${userId}`, { method: 'DELETE', timeoutMs: 60_000 }),
 
   // ── Health logs ──
   getHealthLogs: (userId: number, opts: { days: number; metricType?: string }) =>

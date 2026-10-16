@@ -5,6 +5,8 @@ import { adherenceQuery, medicationsQuery } from '../api/queries'
 import type { Medication } from '../api/types'
 import { useUser } from '../auth/AuthContext'
 import { Tabs } from '../components/Tabs'
+import { CalendarCheck, CalendarX, Check, Clock, Plus, Repeat, SkipForward, Trash2, TrendingUp } from 'lucide-react'
+import { ConfirmDialog, Notice } from '../components/ui'
 import { errorMessage, useToast } from '../components/Toast'
 import { titleCase, todayIso } from '../lib/metrics'
 
@@ -14,6 +16,7 @@ function MedicationCard({ med, userId }: { med: Medication; userId: number }) {
   const queryClient = useQueryClient()
   const notify = useToast()
   const [busy, setBusy] = useState(false)
+  const [confirming, setConfirming] = useState(false)
 
   async function run(action: () => Promise<unknown>, onDone: () => void) {
     setBusy(true)
@@ -22,17 +25,19 @@ function MedicationCard({ med, userId }: { med: Medication; userId: number }) {
       await queryClient.invalidateQueries({ queryKey: ['medications', userId] })
       onDone()
     } catch (err) {
-      notify('error', `❌ ${errorMessage(err)}`)
+      notify('error', `${errorMessage(err)}`)
     } finally {
       setBusy(false)
     }
   }
 
   function handleRemove() {
-    if (!window.confirm(`Remove ${med.name}? Its Google Calendar reminder will be deleted too.`)) return
     void run(
       () => api.removeMedication(med.id),
-      () => notify('success', `✅ ${med.name} removed.`),
+      () => {
+        setConfirming(false)
+        notify('success', `${med.name} removed.`)
+      },
     )
   }
 
@@ -40,49 +45,81 @@ function MedicationCard({ med, userId }: { med: Medication; userId: number }) {
     <div className="card">
       <div className="med-head">
         <div>
-          <span className="med-name">💊 {med.name}</span>
+          <span className="med-name">{med.name}</span>
           <span className="muted"> {med.dosage}</span>
         </div>
-        <span className="caption">
-          {med.has_calendar_event ? '📅 Calendar Reminder Set' : '⚠️ No Calendar Reminder'}
+        {med.has_calendar_event ? (
+          <span className="chip chip-ok">
+            <CalendarCheck className="icon" size={14} aria-hidden="true" />
+            Reminder set
+          </span>
+        ) : (
+          <span className="chip chip-muted">
+            <CalendarX className="icon" size={14} aria-hidden="true" />
+            No reminder
+          </span>
+        )}
+      </div>
+      <div className="med-meta">
+        <span>
+          <Repeat className="icon" size={16} aria-hidden="true" />
+          {titleCase(med.frequency)}
         </span>
+        <span>
+          <Clock className="icon" size={16} aria-hidden="true" />
+          {med.time_of_day || 'N/A'}
+        </span>
+        <span>From {med.start_date}</span>
       </div>
-      <div className="muted">
-        🔁 {titleCase(med.frequency)} &nbsp; ⏰ {med.time_of_day || 'N/A'} &nbsp; 📆 From {med.start_date}
-      </div>
-      {med.notes && <div className="caption">📝 {med.notes}</div>}
+      {med.notes && <div className="caption">{med.notes}</div>}
 
       <div className="grid-3">
         <button
           type="button"
-          className="btn btn-secondary"
+          className="btn btn-success"
           disabled={busy}
           onClick={() =>
             void run(
               () => api.logMedication(med.id, todayIso(), 'taken'),
-              () => notify('success', `✅ ${med.name} marked as taken!`),
+              () => notify('success', `${med.name} marked as taken!`),
             )
           }
         >
-          ✅ Taken
+          <Check className="icon" size={16} aria-hidden="true" />
+          Taken
         </button>
         <button
           type="button"
-          className="btn btn-secondary"
+          className="btn btn-warning"
           disabled={busy}
           onClick={() =>
             void run(
               () => api.logMedication(med.id, todayIso(), 'skipped'),
-              () => notify('warning', `⚠️ ${med.name} marked as skipped.`),
+              () => notify('warning', `${med.name} marked as skipped.`),
             )
           }
         >
-          ❌ Skipped
+          <SkipForward className="icon" size={16} aria-hidden="true" />
+          Skipped
         </button>
-        <button type="button" className="btn btn-secondary" disabled={busy} onClick={handleRemove}>
-          🗑️ Remove
+        <button type="button" className="btn btn-secondary" disabled={busy} onClick={() => setConfirming(true)}>
+          <Trash2 className="icon" size={16} aria-hidden="true" />
+          Remove
         </button>
       </div>
+      {confirming && (
+        <ConfirmDialog
+          title={`Remove ${med.name}?`}
+          confirmLabel="Remove"
+          busy={busy}
+          onConfirm={handleRemove}
+          onCancel={() => setConfirming(false)}
+        >
+          <p className="muted" style={{ margin: 0 }}>
+            Its Google Calendar reminder will be deleted too.
+          </p>
+        </ConfirmDialog>
+      )}
     </div>
   )
 }
@@ -94,13 +131,13 @@ function MedicationsTab({ userId }: { userId: number }) {
 
   return (
     <>
-      <h3>📊 Active Medications</h3>
+      <h2>Active medications</h2>
       {query.isPending && <p className="caption">Loading...</p>}
-      {query.isError && <p className="notice notice-error">❌ {query.error.message}</p>}
+      {query.isError && <Notice tone="error">{query.error.message}</Notice>}
       {query.data && meds.length === 0 && (
-        <p className="notice notice-info">
-          💤 No medications added yet. Add your first medication in the "Add Medication" tab.
-        </p>
+        <Notice tone="info">
+          No medications added yet. Add your first medication in the "Add Medication" tab.
+        </Notice>
       )}
       {meds.map((med) => (
         <MedicationCard key={med.id} med={med} userId={userId} />
@@ -124,7 +161,7 @@ function AddMedicationTab({ userId }: { userId: number }) {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     if (!name.trim()) {
-      notify('error', '❌ Medication name is required.')
+      notify('error', 'Medication name is required.')
       return
     }
     setSaving(true)
@@ -139,17 +176,17 @@ function AddMedicationTab({ userId }: { userId: number }) {
         notes: notes.trim() || null,
       })
       void queryClient.invalidateQueries({ queryKey: ['medications', userId] })
-      notify('success', `✅ ${name.trim()} added successfully!`)
+      notify('success', `${name.trim()} added successfully!`)
       if (result.calendar_event === 'created') {
-        notify('info', '📅 Google Calendar reminder created! Check your calendar.')
+        notify('info', 'Google Calendar reminder created! Check your calendar.')
       } else {
-        notify('warning', '⚠️ Calendar reminder could not be created (login may need refresh).')
+        notify('warning', 'Calendar reminder could not be created (login may need refresh).')
       }
       setName('')
       setDosage('')
       setNotes('')
     } catch (err) {
-      notify('error', `❌ ${errorMessage(err)}`)
+      notify('error', `${errorMessage(err)}`)
     } finally {
       setSaving(false)
     }
@@ -157,17 +194,18 @@ function AddMedicationTab({ userId }: { userId: number }) {
 
   return (
     <form className="form" onSubmit={handleSubmit}>
-      <h3>➕ Add New Medication</h3>
+      <h2>Add new medication</h2>
       <p className="caption">
-        📅 A recurring Google Calendar reminder will automatically be created for this medication.
+        A recurring reminder will be created in your Google Calendar for this medication. HealthAgent only creates and
+        deletes the reminder events it adds; it does not read your other events.
       </p>
       <div className="grid-2">
         <label className="field">
-          Medication Name *
+          Medication name (required)
           <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Metformin" />
         </label>
         <label className="field">
-          Time of Day
+          Time of day
           <input type="text" value={time} onChange={(e) => setTime(e.target.value)} />
           <span className="caption">Format: HH:MM (24hr). For twice daily, use e.g. 08:00,20:00</span>
         </label>
@@ -180,7 +218,7 @@ function AddMedicationTab({ userId }: { userId: number }) {
           <input type="date" value={start} onChange={(e) => setStart(e.target.value)} />
         </label>
         <label className="field">
-          Frequency *
+          Frequency (required)
           <select value={frequency} onChange={(e) => setFrequency(e.target.value)}>
             {FREQUENCIES.map((f) => (
               <option key={f} value={f}>
@@ -199,7 +237,8 @@ function AddMedicationTab({ userId }: { userId: number }) {
         <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="e.g. Take with food" />
       </label>
       <button type="submit" className="btn btn-primary btn-block" disabled={saving}>
-        {saving ? 'Saving...' : '💾 Add Medication & Create Reminder'}
+        <Plus className="icon" size={18} aria-hidden="true" />
+        {saving ? 'Saving...' : 'Add medication and create reminder'}
       </button>
     </form>
   )
@@ -212,7 +251,7 @@ function AdherenceTab({ userId }: { userId: number }) {
 
   return (
     <>
-      <h3>📊 Medication Adherence Report</h3>
+      <h2>Adherence report</h2>
       <label className="field">
         Report Period (days): {days}
         <input type="range" min={7} max={90} value={days} onChange={(e) => setDays(Number(e.target.value))} />
@@ -220,24 +259,29 @@ function AdherenceTab({ userId }: { userId: number }) {
 
       {query.isPending && <p className="caption">Loading...</p>}
       {query.isError && (
-        <p className="notice notice-error">❌ Could not load adherence report: {query.error.message}</p>
+        <Notice tone="error">Could not load adherence report: {query.error.message}</Notice>
       )}
       {stats &&
         (stats.total_medications === 0 ? (
-          <p className="notice notice-info">
+          <Notice tone="info">
             No adherence data yet. Add a medication and use the "My Medications" tab to log doses.
-          </p>
+          </Notice>
         ) : (
           <div className="card">
-            <div className="metric-title">Overall Adherence (Last {stats.period_days} days)</div>
+            <div className="metric-title">
+              <TrendingUp className="icon" size={16} aria-hidden="true" />
+              Overall adherence (last {stats.period_days} days)
+            </div>
             <div className="metric-value">{Math.round(stats.adherence_rate)}%</div>
             <div className={stats.adherence_rate >= 80 ? 'metric-good' : 'metric-warn'}>
-              {stats.adherence_rate >= 80 ? '👍 Great!' : '⚠️ Needs Improvement'}
+              {stats.adherence_rate >= 80 ? 'Great, keep it up.' : 'Needs improvement'}
             </div>
             <progress max={100} value={Math.min(stats.adherence_rate, 100)} />
-            <div className="muted">
-              ✅ Taken: {stats.taken} &nbsp; ❌ Skipped: {stats.skipped} &nbsp; 🟡 Not logged: {stats.not_logged}{' '}
-              &nbsp; of {stats.total_expected_doses} expected doses
+            <div className="stat-row">
+              <span>Taken: {stats.taken}</span>
+              <span>Skipped: {stats.skipped}</span>
+              <span>Not logged: {stats.not_logged}</span>
+              <span>of {stats.total_expected_doses} expected doses</span>
             </div>
           </div>
         ))}
@@ -250,14 +294,11 @@ export function Medications() {
 
   return (
     <>
-      <h2>💊 Medication Manager</h2>
-      <p className="muted">Track your prescriptions, log doses, and set Google Calendar reminders</p>
-      <hr />
       <Tabs
         tabs={[
-          { id: 'list', label: '📊 My Medications', content: <MedicationsTab userId={userId} /> },
-          { id: 'add', label: '➕ Add Medication', content: <AddMedicationTab userId={userId} /> },
-          { id: 'adherence', label: '📊 Adherence Report', content: <AdherenceTab userId={userId} /> },
+          { id: 'list', label: 'My Medications', content: <MedicationsTab userId={userId} /> },
+          { id: 'add', label: 'Add Medication', content: <AddMedicationTab userId={userId} /> },
+          { id: 'adherence', label: 'Adherence Report', content: <AdherenceTab userId={userId} /> },
         ]}
       />
     </>

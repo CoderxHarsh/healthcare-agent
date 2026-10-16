@@ -1,38 +1,47 @@
+import { Link } from 'react-router-dom'
+import { FileText, HeartPulse, KeyRound, MessageCircle, Pill, FileDown } from 'lucide-react'
 import { api } from '../api/client'
 import { ChatPanel } from '../components/ChatPanel'
 import { Shell } from '../components/Layout'
+import { APP_NAME } from '../config'
 
 const FEATURES = [
-  { label: '🤖 AI Chat', tone: 'blue' },
-  { label: '📊 Vitals', tone: 'green' },
-  { label: '💊 Medications', tone: 'yellow' },
-  { label: '📄 RAG Docs', tone: 'purple' },
-  { label: '📥 PDF Reports', tone: 'pink' },
+  { label: 'AI Chat', tone: 'blue', Icon: MessageCircle },
+  { label: 'Vitals', tone: 'green', Icon: HeartPulse },
+  { label: 'Medications', tone: 'yellow', Icon: Pill },
+  { label: 'Your documents', tone: 'purple', Icon: FileText },
+  { label: 'PDF Reports', tone: 'pink', Icon: FileDown },
 ]
 
 export function Landing() {
   return (
     <Shell
+      guest
       sidebar={
         <>
-          <p className="notice notice-info">
-            Log in to access your personal dashboard, track vitals, and get tailored AI insights.
-          </p>
+          <div className="guest-copy">
+            <p className="notice notice-info">
+              Log in to access your personal dashboard, track vitals, and get tailored AI insights.
+            </p>
+          </div>
           <a className="btn btn-primary" href={api.loginUrl}>
-            🔗 Login with Google
+            <KeyRound className="icon" size={18} aria-hidden="true" />
+            <span className="nav-label">Continue with Google</span>
           </a>
         </>
       }
     >
       <section className="hero">
-        <h1>🏥 HealthCare AI Assistant</h1>
-        <p className="muted">
-          AI-powered health companion — chat, track vitals, manage meds &amp; get personalized insights.
+        <h1>Your AI health companion.</h1>
+        <p className="lead">
+          {APP_NAME} is a personal health companion: chat about your health, track vitals, manage medications and get
+          personalized insights.
         </p>
         <div className="pills">
-          {FEATURES.map((f) => (
-            <span key={f.label} className={`pill pill-${f.tone}`}>
-              {f.label}
+          {FEATURES.map(({ label, tone, Icon }) => (
+            <span key={label} className={`pill pill-${tone}`}>
+              <Icon className="icon" size={16} aria-hidden="true" />
+              {label}
             </span>
           ))}
         </div>
@@ -40,9 +49,21 @@ export function Landing() {
 
       <hr />
 
-      <h3>💬 Try it now — Chat as Guest</h3>
+      <section aria-labelledby="google-use">
+        <h2 id="google-use">How {APP_NAME} uses your Google account</h2>
+        <p>
+          You sign in with Google. We use your name, email address and profile picture only to create and identify your
+          account. If you add a medication reminder, {APP_NAME} asks for permission to create and delete those reminder
+          events in your Google Calendar. We never read your other calendar events, and we never sell your data. Read
+          the <Link to="/privacy">Privacy Policy</Link> and <Link to="/terms">Terms of Service</Link>.
+        </p>
+      </section>
+
+      <hr />
+
+      <h2>Try it now, chat as a guest</h2>
       <p className="caption">
-        Login with Google to unlock personalized insights, vitals tracking, and your private health history.
+        Log in with Google to unlock personalized insights, vitals tracking, and your private health history.
       </p>
       <ChatPanel />
     </Shell>
